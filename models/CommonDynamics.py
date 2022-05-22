@@ -1,20 +1,21 @@
 """
 @file CommonDynamics
 
-
+A common class that each latent dynamics function inherits.
+Holds the training + validation step logic and the VAE components for reconstructions.
 """
 import os
 import torch
 import shutil
 import numpy as np
 import torch.nn as nn
-import pytorch_lightning2
+import pytorch_lightning
 
 from utils.plotting import show_images
 from models.CommonVAE import LatentStateEncoder, EmissionDecoder
 
 
-class Dynamics(pytorch_lightning.LightningModule):
+class LatentDynamicsModel(pytorch_lightning.LightningModule):
     def __init__(self, args, top, exptop):
         """ Latent dynamics as parameterized by a global deterministic LSTM """
         super().__init__()
@@ -44,11 +45,22 @@ class Dynamics(pytorch_lightning.LightningModule):
         raise NotImplementedError("In model_specific_loss: Latent Dynamics function not specified.")
 
     def configure_optimizers(self):
-        # Define optimizer
-        encoder_optim = torch.optim.Adam(self.parameters(), lr=self.args.learning_rate)
-        return encoder_optim
+        """
+        Most standard NSSM models have a joint optimization step under one ELBO, however there is room
+        for EM-optimization procedures based on the PGM.
+
+        By default, we assume a joint optim with the Adam Optimizer.
+        """
+        optim = torch.optim.Adam(self.parameters(), lr=self.args.learning_rate)
+        return optim
 
     def training_step(self, batch, batch_idx):
+        """
+        PyTorch-Lightning training step where the network is propagated and returns a single loss value,
+        which is automatically handled for the backward update
+        :param batch: list of dictionary objects representing a single image
+        :param batch_idx: how far in the epoch this batch is
+        """
         # Stack batch and restrict to generation length
         images = torch.stack([b['image'] for b in batch[0]])
         images = images[:, :self.args.generation_len]
@@ -71,13 +83,17 @@ class Dynamics(pytorch_lightning.LightningModule):
         # Build the full loss
         loss = likelihood + (self.args.z0_beta * klz) + dynamics_loss
 
-        # Return outputs
+        # Return outputs as dict
         if batch_idx >= self.last_train_idx - 25:
             return {"loss": loss, "preds": preds.detach(), "images": images.detach(), "emebeddings": embeddings}
         else:
             return {"loss": loss}
 
     def training_epoch_end(self, outputs):
+        """
+        Upon epoch end, save the training file and show reconstructions every 10 epochs
+        :param outputs: list of outputs from the training steps, with the last 25 steps having reconstructions
+        """
         # Make image dir in lightning experiment folder if it doesn't exist
         if not os.path.exists('lightning_logs/version_{}/images/'.format(self.top)):
             os.mkdir('lightning_logs/version_{}/images/'.format(self.top))
@@ -96,6 +112,11 @@ class Dynamics(pytorch_lightning.LightningModule):
                                 "experiments/{}/{}/version_{}".format(self.args.model, self.args.exptype, self.exptop))
 
     def validation_step(self, batch, batch_idx):
+        """
+        PyTorch-Lightning validation step. Similar to the training step but on the given val set under torch.no_grad()
+        :param batch: list of dictionary objects representing a single image
+        :param batch_idx: how far in the epoch this batch is
+        """
         # Stack batch and restrict to generation length
         images = torch.stack([b['image'] for b in batch[0]])
         images = images[:, :self.args.generation_len]
@@ -120,6 +141,10 @@ class Dynamics(pytorch_lightning.LightningModule):
             return {"loss"}
 
     def validation_epoch_end(self, outputs):
+        """
+        Upon epoch end, save the training file and show reconstructions every 5 epochs
+        :param outputs: list of outputs from the validation steps at batch 0
+        """
         # Make image dir in lightning experiment folder if it doesn't exist
         if not os.path.exists('lightning_logs/version_{}/images/'.format(self.top)):
             os.mkdir('lightning_logs/version_{}/images/'.format(self.top))
@@ -132,6 +157,11 @@ class Dynamics(pytorch_lightning.LightningModule):
                         'lightning_logs/version_{}/images/recon{}val.png'.format(self.top, self.current_epoch))
 
     def test_step(self, batch, batch_idx):
+        """
+        PyTorch-Lightning testing step. For every batch, get the predictions and per_pixel MSE averages over time
+        :param batch: list of dictionary objects representing a single image
+        :param batch_idx: how far in the epoch this batch is
+        """
         images = torch.stack([b['image'] for b in batch[0]])
 
         # Get predictions and C embeddings
@@ -141,15 +171,20 @@ class Dynamics(pytorch_lightning.LightningModule):
         bce_r, bce_g = self.bce(preds[:, :1], images[:, :1]).sum([2, 3]).view([-1]).mean(), \
                        self.bce(preds[:, 1:], images[:, 1:]).sum([2, 3, 4]).view([-1]).mean()
 
+        # Overall loss
+        loss = (self.args.r_beta * bce_r) + bce_g
+
         # Per pixel MSE loss
         pixel_mse = self.bce(preds, images)
         pixel_mse = pixel_mse.sum([2]).view([preds.shape[0], preds.shape[1], -1])
         pixel_mse = pixel_mse.mean([2])
-
-        loss = (self.args.r_beta * bce_r) + bce_g
         return {"loss": loss, "pixel_mse": pixel_mse.detach(), "preds": preds.detach(), "images": images.detach()}
 
     def test_epoch_end(self, outputs):
+        """
+        For testing end, save the predictions, gt, and MSE to NPY files in the respective experiment folder
+        :param outputs: list of outputs from the validation steps at batch 0
+        """
         pixel_mse, preds, images = [], [], []
 
         # Compile and save reconstructions vs GT to files
@@ -164,7 +199,7 @@ class Dynamics(pytorch_lightning.LightningModule):
         images = torch.vstack(images).detach().cpu().numpy()
 
         # Save files
-        ckpt_path = "experiments/{}/combined2000_set/version_{}/".format(self.args.model, self.exptop - 1)
+        ckpt_path = "experiments/{}/{}/version_{}/".format(self.args.model, self.args.exptype, self.exptop)
         np.save("{}/pixel_mse.npy".format(ckpt_path), pixel_mse)
         np.save("{}/recons.npy".format(ckpt_path), preds)
         np.save("{}/images.npy".format(ckpt_path), images)
