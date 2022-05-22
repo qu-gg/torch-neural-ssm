@@ -11,6 +11,7 @@ import numpy as np
 import torch.nn as nn
 import pytorch_lightning
 
+from utils.metrics import vpt, dst
 from utils.plotting import show_images
 from models.CommonVAE import LatentStateEncoder, EmissionDecoder
 
@@ -88,13 +89,18 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
 
         # Initial encoder loss
         klz = self.encoder.kl_z_term()
-        self.log("klz_loss", likelihood, prog_bar=True)
+        self.log("klz_loss", self.args.z0_beta * klz, prog_bar=True)
 
         # Get the loss terms from the specific latent dynamics loss
         dynamics_loss = self.model_specific_loss()
 
         # Build the full loss
         loss = likelihood + (self.args.z0_beta * klz) + dynamics_loss
+
+        # Log various metrics
+        self.log("train_vpt", vpt(images, preds.detach()), prog_bar=True)
+        self.log("train_pixel_mse", likelihood / (self.args.dim ** 2), prog_bar=True)
+        self.log("train_dst", dst(images, preds.detach())[1], prog_bar=True)
 
         # Return outputs as dict
         if batch_idx >= self.last_train_idx - 25:
@@ -115,7 +121,9 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         """ Every 10 epochs, get reconstructions on batch of data """
         if self.current_epoch % 10 == 0:
             # Show side-by-side reconstructions
-            show_images(outputs[-1]["images"][:5], outputs[-1]["preds"][:5], 'lightning_logs/version_{}/images/recon{}train.png'.format(self.top, self.current_epoch))
+            show_images(outputs[-1]["images"], outputs[-1]["preds"],
+                        'lightning_logs/version_{}/images/recon{}train.png'.format(self.top, self.current_epoch),
+                        num_out=5)
 
             # Copy experiment to relevant folder
             if self.args.exptype is not None:
@@ -166,8 +174,9 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         """ Every 10 epochs, get reconstructions on batch of data """
         if self.current_epoch % 5 == 0 and self.current_epoch != 0:
             # Show side-by-side reconstructions
-            show_images(outputs[0]["images"][:5], outputs[0]["preds"][:5],
-                        'lightning_logs/version_{}/images/recon{}val.png'.format(self.top, self.current_epoch))
+            show_images(outputs[0]["images"], outputs[0]["preds"],
+                        'lightning_logs/version_{}/images/recon{}val.png'.format(self.top, self.current_epoch),
+                        num_out=5)
 
     def test_step(self, batch, batch_idx):
         """

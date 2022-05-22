@@ -19,7 +19,7 @@ def show_images(images, preds, out_loc, num_out=None):
     """
     assert len(images.shape) == 4       # Assert both matrices are [Batch, Timesteps, H, W]
     assert len(preds.shape) == 4
-    assert type(num_out) in [int, None]
+    assert type(num_out) is int or type(num_out) is None
 
     # Make sure objects are in numpy format
     images = images.cpu().numpy()

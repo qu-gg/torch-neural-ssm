@@ -12,7 +12,7 @@ from utils.utils import get_exp_versions, get_model
 
 
 class Dataset(pytorch_lightning.LightningDataModule):
-    def __init__(self, args, batch_size=32, workers=8):
+    def __init__(self, args, batch_size=32, workers=0):
         super(Dataset, self).__init__()
 
         bucket = "data/{}/{}/train_tars/".format(args.dataset, args.dataset_ver)
