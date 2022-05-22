@@ -48,6 +48,9 @@ class LSTM(LatentDynamicsModel):
         x_rec = self.decoder(zt)
         return x_rec
 
-    def model_specific_loss(self):
-        # No specific model loss
-        return 0
+    @staticmethod
+    def add_model_specific_args(parent_parser):
+        """ Placeholder function for model-specific arguments """
+        parser = parent_parser.add_argument_group("LSTM")
+        parser.add_argument('--model_file', type=str, default="LSTM", help='filename of the model')
+        return parent_parser

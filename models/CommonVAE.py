@@ -11,7 +11,7 @@ from torch.distributions import Normal, kl_divergence as kl
 
 
 class LatentStateEncoder(nn.Module):
-    def __init__(self, z_amort, num_filters, num_channels, latent_dim):
+    def __init__(self, z_amort, num_filters, num_channels, latent_dim, fix_variance):
         """
         Holds the convolutional encoder that takes in a sequence of images and outputs the
         initial state of the latent dynamics
@@ -35,7 +35,7 @@ class LatentStateEncoder(nn.Module):
             nn.Conv2d(num_filters * 2, num_filters * 4, kernel_size=5, stride=2, padding=(2, 2)),
             nn.Tanh(),
             Flatten(),
-            Gaussian(num_filters * 4 ** 3, latent_dim)
+            Gaussian(num_filters * 4 ** 3, latent_dim, fix_variance)
         )
 
         # Holds generated z0 means and logvars for use in KL calculations

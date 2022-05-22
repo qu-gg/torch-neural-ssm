@@ -34,9 +34,8 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         self.last_train_idx = last_train_idx
 
         # Encoder + Decoder
-        self.encoder = LatentStateEncoder(self.args.z_amort, self.args.num_filt, 1, self.args.latent_dim)
-        self.decoder = EmissionDecoder(self.args.batch_size, self.args.generation_len, self.args.dim,
-                                       self.args.num_filt, 1, self.args.latent_dim)
+        self.encoder = LatentStateEncoder(self.args.z_amort, self.args.num_filt, 1, self.args.latent_dim, self.args.fix_variance)
+        self.decoder = EmissionDecoder(self.args.batch_size, self.args.generation_len, self.args.dim, self.args.num_filt, 1, self.args.latent_dim)
 
         # Recurrent dynamics function
         self.dynamics_func = None
@@ -111,7 +110,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         # Make image dir in lightning experiment folder if it doesn't exist
         if not os.path.exists('lightning_logs/version_{}/images/'.format(self.top)):
             os.mkdir('lightning_logs/version_{}/images/'.format(self.top))
-            shutil.copy("models/{}.py", "lightning_logs/version_{}/".format(self.model_name, self.top))
+            shutil.copy("models/{}.py".format(self.args.model_file), "lightning_logs/version_{}/".format(self.top))
 
         """ Every 10 epochs, get reconstructions on batch of data """
         if self.current_epoch % 10 == 0:
@@ -150,7 +149,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         loss = likelihood + dynamics_loss
 
         if batch_idx == 0:
-            return {"loss": loss, "preds": preds.detach(), "images": images.detach(), "embeddings": embeddings.detach()}
+            return {"loss": loss, "preds": preds.detach(), "images": images.detach(), "embeddings": embeddings}
         else:
             return {"loss"}
 
@@ -162,7 +161,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         # Make image dir in lightning experiment folder if it doesn't exist
         if not os.path.exists('lightning_logs/version_{}/images/'.format(self.top)):
             os.mkdir('lightning_logs/version_{}/images/'.format(self.top))
-            shutil.copy("models/{}.py", "lightning_logs/version_{}/".format(self.model_name, self.top))
+            shutil.copy("models/{}.py".format(self.args.model_file), "lightning_logs/version_{}/".format(self.top))
 
         """ Every 10 epochs, get reconstructions on batch of data """
         if self.current_epoch % 5 == 0 and self.current_epoch != 0:

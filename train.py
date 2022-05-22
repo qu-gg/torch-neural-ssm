@@ -77,17 +77,17 @@ def parse_args():
     parser.add_argument('--dataset_ver', type=str, default='pendulum_10000samples_65steps',
                         help='dataset version for training')
 
-    # Learning hyper-parameters
+    # Learning parameters
     parser.add_argument('--num_epochs', type=int, default=200, help='number of epochs to run over')
     parser.add_argument('--batch_size', type=int, default=16, help='size of batch')
     parser.add_argument('--learning_rate', type=float, default=1e-3, help='initial learning rate')
 
-    # Dimensions of different components
-    parser.add_argument('--dim', type=int, default=32, help='dimension of the image data')
-
     # Tuning parameters
     parser.add_argument('--z0_beta', type=float, default=0.1, help='multiplier for z0 term in loss')
     parser.add_argument('--kl_beta', type=float, default=0.001, help='multiplier for encoder kl terms in loss')
+
+    # Input dimensions
+    parser.add_argument('--dim', type=int, default=32, help='dimension of the image data')
 
     # Latent network dimensions
     parser.add_argument('--latent_dim', type=int, default=16, help='latent dimension size')
@@ -96,6 +96,7 @@ def parse_args():
 
     # Convolutional dimensions
     parser.add_argument('--z_amort', type=int, default=5, help='how many X samples to use in z0 inference')
+    parser.add_argument('--fix_variance', type=bool, default=False, help='whether to fix variance in z0 encoding')
     parser.add_argument('--num_filt', type=int, default=8, help='number of filters in the CNNs')
 
     # Timesteps of generation

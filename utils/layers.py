@@ -42,13 +42,17 @@ class Gaussian(nn.Module):
         return z
 
     def forward(self, x):
+        """
+        Forward function of the Gaussian layer. Handles getting the distributional parameters and sampling a vector
+        :param x: input vector [BatchSize, InputDim]
+        """
         # Get mu and logvar
         mu = self.mu(x)
 
         if self.fix_variance:
             logvar = torch.full_like(mu, fill_value=0.1)
         else:
-            logvar = self.var(x)
+            logvar = self.logvar(x)
 
         # Check on whether mu/logvar are getting out of normal ranges
         if (mu < -100).any() or (mu > 85).any() or (logvar < -100).any() or (logvar > 85).any():

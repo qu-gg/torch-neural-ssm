@@ -9,22 +9,7 @@ import torch.nn as nn
 
 def get_model(name):
     """ Import and return the specific latent dynamics function by the given name"""
-    if name == "global":
-        from models.MultiSSM_Global import GlobalMultiSSM
-        return GlobalMultiSSM
-    elif name == "globalDet":
-        from models.MultiSSM_Global_Det import GlobalMultiSSM
-        return GlobalMultiSSM
-    elif name == "node":
-        from models.NeuralODE import NeuralODE
-        return NeuralODE
-    elif name == "res":
-        from models.RGNRes import RGNRes
-        return RGNRes
-    elif name == "rgn":
-        from models.RGN import RGN
-        return RGN
-    elif name == "lstm":
+    if name == "lstm":
         from models.LSTM import LSTM
         return LSTM
     else:
