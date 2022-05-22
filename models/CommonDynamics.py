@@ -1,5 +1,5 @@
 """
-@file CommonDynamics
+@file CommonDynamics.py
 
 A common class that each latent dynamics function inherits.
 Holds the training + validation step logic and the VAE components for reconstructions.
@@ -16,8 +16,14 @@ from models.CommonVAE import LatentStateEncoder, EmissionDecoder
 
 
 class LatentDynamicsModel(pytorch_lightning.LightningModule):
-    def __init__(self, args, top, exptop):
-        """ Latent dynamics as parameterized by a global deterministic LSTM """
+    def __init__(self, args, top, exptop, last_train_idx):
+        """
+        Generic implementation of a Latent Dynamics Model
+        Holds the training and testing boilerplate, as well as experiment tracking
+        :param args: passed in user arguments
+        :param top: top lightning log version
+        :param exptop: top experiment folder version
+        """
         super().__init__()
         self.save_hyperparameters(args)
 
@@ -25,6 +31,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         self.args = args
         self.top = top
         self.exptop = exptop
+        self.last_train_idx = last_train_idx
 
         # Encoder + Decoder
         self.encoder = LatentStateEncoder(self.args.z_amort, self.args.num_filt, 1, self.args.latent_dim)
@@ -36,13 +43,20 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         self.dynamics_out = None
 
         # Losses
-        self.bce = nn.MSELoss(reduction='none')
+        self.reconstruction_loss = nn.MSELoss(reduction='none')
 
     def forward(self, x):
+        """ Placeholder function for the dynamics forward pass """
         raise NotImplementedError("In forward: Latent Dynamics function not specified.")
 
     def model_specific_loss(self):
-        raise NotImplementedError("In model_specific_loss: Latent Dynamics function not specified.")
+        """ Placeholder function for any additional loss terms a dynamics function may have """
+        return 0
+
+    @staticmethod
+    def add_model_specific_args(parent_parser):
+        """ Placeholder function for model-specific arguments """
+        return parent_parser
 
     def configure_optimizers(self):
         """
@@ -70,7 +84,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         preds, embeddings = output if len(output) > 1 else output, None
 
         # Reconstruction loss
-        likelihood = self.bce(preds, images).sum([2, 3]).view([-1]).mean()
+        likelihood = self.reconstruction_loss(preds, images).sum([2, 3]).view([-1]).mean()
         self.log("likelihood", likelihood, prog_bar=True)
 
         # Initial encoder loss
@@ -126,7 +140,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         preds, embeddings = output if len(output) > 1 else output, None
 
         # Reconstruction loss
-        likelihood = self.bce(preds, images).sum([2, 3]).view([-1]).mean()
+        likelihood = self.reconstruction_loss(preds, images).sum([2, 3]).view([-1]).mean()
         self.log("likelihood", likelihood, prog_bar=True)
 
         # Get the loss terms from the specific latent dynamics loss
@@ -165,14 +179,11 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         images = torch.stack([b['image'] for b in batch[0]])
 
         # Get predictions and C embeddings
-        preds = self(images)
+        output = self(images)
+        preds, embeddings = output if len(output) > 1 else (output, None)
 
-        # Averaged sequence loss
-        bce_r, bce_g = self.bce(preds[:, :1], images[:, :1]).sum([2, 3]).view([-1]).mean(), \
-                       self.bce(preds[:, 1:], images[:, 1:]).sum([2, 3, 4]).view([-1]).mean()
-
-        # Overall loss
-        loss = (self.args.r_beta * bce_r) + bce_g
+        # Reconstruction loss
+        loss = self.reconstruction_loss(preds, images).sum([2, 3]).view([-1]).mean()
 
         # Per pixel MSE loss
         pixel_mse = self.bce(preds, images)

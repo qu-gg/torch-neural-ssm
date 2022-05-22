@@ -5,13 +5,13 @@ Holds the model for the LSTM latent dynamics function
 """
 import torch
 import torch.nn as nn
-from models.CommonDynamics import Dynamics
+from models.CommonDynamics import LatentDynamicsModel
 
 
-class LSTM(Dynamics):
-    def __init__(self, args, top, exptop):
+class LSTM(LatentDynamicsModel):
+    def __init__(self, args, top, exptop, last_train_idx):
         """ Latent dynamics as parameterized by a global deterministic LSTM """
-        super(Dynamics).__init__(args, top, exptop)
+        super().__init__(args, top, exptop, last_train_idx)
 
         # Recurrent dynamics function
         self.dynamics_func = nn.LSTMCell(input_size=args.latent_dim, hidden_size=args.num_hidden)
