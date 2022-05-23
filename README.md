@@ -16,11 +16,21 @@ Included is an abstract PyTorch-Lightning training class structure with specific
 ## Table of Contents
 - [About](#about)
 - [Table of Contents](#toc)
-- [What are Neural SSMs?](#neuralSSMwhat)
-- [Choice of SSM PGM](#pgmChoice)
-- [To-Do](#todo)
-- [References](#references)
+- [Background](#background)
+  - [What are Neural SSMs?](#neuralSSMwhat)
+  - [Choice of SSM PGM](#pgmChoice)
+- [Implementation](#implementation)
+- [Miscellaneous](#misc)
+  - [To-Do](#todo)
+  - [Contributions](#contributions)
+  - [References](#references)
 
+<!-- BACKGROUND -->
+<a name="background"/>
+
+# Background
+
+<!-- Neural SSM INTRO -->
 <a name="neuralSSMwhat"/>
 
 ## What are Neural SSMs?
@@ -32,6 +42,7 @@ Due to their explicit differentiation of transition and emission and leveraging 
 <p> </p>
 Given the fast pace of progress in latent dynamics modelling over recent years, many models have been presented under a variety of terminologies and proposed frameworks - examples being variational latent recurrent models<sup>[5,9,10,11,12]</sup>, deep state space models<sup>[1,2,3,7,13,14]</sup>, and deterministic encoding-decoding models<sup>[4,15,16]</sup>. Despite differences in appearance, they all adhere to the same conceptual framework of latent variable modelling and state-space disentanglement. As such, here we unify them under the term of Neural SSMs and segment them into the two base choices of probabilistic graphical models that they adhere to: <i>system identification</i> and <i>state estimation</i>. We highlight each PGM's properties and limitations with experimental evaluations on benchmark datasets.
 
+<!-- PGM CHOICES -->
 <a name="pgmChoice"/>
 
 ## Choice of PGM - System Identification vs State Estimation
@@ -39,6 +50,23 @@ The PGM associated with each approach is determined by the latent variable chose
 
 <b>System states as latent variables</b>: The intuitive choice for the latent variable is the latent state <b>z_k</b> that underlies <b>x_k</b>, given that it is already latent in the system and is directly associated with the observations. The PGM of this form is shown under Fig. 1A
 
+<!-- IMPLEMENTATION -->
+<a name="implementation"/>
+
+# Implementation
+
+## Data
+
+## Models
+
+## Metrics
+
+<!-- Miscellaneous -->
+<a name="misc"/>
+
+# Miscellaneous
+
+<!-- TO-DO -->
 <a name="todo"/>
 
 ## To-Do
@@ -59,7 +87,13 @@ The PGM associated with each approach is determined by the latent variable chose
 - Implement R^2 coefficient statistics from latent state to physical variables
 - Implement latent walk visualizations against data-space observations (like in DVBF)
 
+<!-- CONTRIBUTIONS -->
+<a name="contributions"/>
 
+## Contributions
+Contributions are welcome and encouraged! If you have an implementation of a latent dynamics function you think would be relevant and add to the conversation, feel free to submit an Issue or PR and we can discuss its incorporation. Similarly, if you feel an area of the README is lacking or contains errors, please put up a README editing PR with your suggested updates. Even tackling items on the To-Do would be massively helpful!
+
+<!-- REFERENCES  -->
 <a name="references"/>
 
 ## References
