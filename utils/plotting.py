@@ -11,7 +11,6 @@ def show_images(images, preds, out_loc, num_out=None):
     """
     Constructs an image of multiple time-series reconstruction samples compared against its relevant ground truth
     Saves locally in the given out location
-
     :param images: ground truth images
     :param preds: predictions from a given model
     :out_loc: where to save the generated image

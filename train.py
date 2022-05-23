@@ -70,7 +70,7 @@ def parse_args():
     # Experiment ID
     parser.add_argument('--exptype', type=str, default='pendulum', help='experiment folder name')
     parser.add_argument('--checkpt', type=str, default='None', help='checkpoint to resume training from')
-    parser.add_argument('--model', type=str, default='lstm', help='which model to use for training')
+    parser.add_argument('--model', type=str, default='node', help='which model to use for training')
 
     # Dataset-to-use parameters
     parser.add_argument('--dataset', type=str, default='pendulum', help='dataset name for training')
@@ -90,9 +90,9 @@ def parse_args():
     parser.add_argument('--dim', type=int, default=32, help='dimension of the image data')
 
     # Latent network dimensions
-    parser.add_argument('--latent_dim', type=int, default=16, help='latent dimension size')
-    parser.add_argument('--num_layers', type=int, default=2, help='number of layers in the ODE func')
-    parser.add_argument('--num_hidden', type=int, default=128, help='number of nodes per layer in ODE func')
+    parser.add_argument('--latent_dim', type=int, default=64, help='latent dimension size')
+    parser.add_argument('--num_layers', type=int, default=4, help='number of layers in the ODE func')
+    parser.add_argument('--num_hidden', type=int, default=250, help='number of nodes per layer in ODE func')
 
     # Convolutional dimensions
     parser.add_argument('--z_amort', type=int, default=5, help='how many X samples to use in z0 inference')

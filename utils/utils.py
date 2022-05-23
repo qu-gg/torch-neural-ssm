@@ -9,7 +9,10 @@ import torch.nn as nn
 
 def get_model(name):
     """ Import and return the specific latent dynamics function by the given name"""
-    if name == "lstm":
+    if name == "node":
+        from models.NeuralODE import NeuralODE
+        return NeuralODE
+    elif name == "lstm":
         from models.LSTM import LSTM
         return LSTM
     else:

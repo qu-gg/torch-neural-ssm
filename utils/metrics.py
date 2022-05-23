@@ -8,7 +8,7 @@ import numpy as np
 from skimage.filters import threshold_otsu
 
 
-def vpt(gt, preds, epsilon=0.025):
+def vpt(gt, preds, epsilon=0.010):
     """
     Computes the Valid Prediction Time metric, as proposed in https://openreview.net/pdf?id=qBl8hnwR0px
     VPT = argmin_t [MSE(gt, pred) > epsilon]

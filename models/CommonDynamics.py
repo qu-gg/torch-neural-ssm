@@ -118,8 +118,8 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
             os.mkdir('lightning_logs/version_{}/images/'.format(self.top))
             shutil.copy("models/{}.py".format(self.args.model_file), "lightning_logs/version_{}/".format(self.top))
 
-        """ Every 10 epochs, get reconstructions on batch of data """
-        if self.current_epoch % 10 == 0:
+        """ Every N epochs, get reconstructions on batch of data """
+        if self.current_epoch % 4 == 0:
             # Show side-by-side reconstructions
             show_images(outputs[-1]["images"], outputs[-1]["preds"],
                         'lightning_logs/version_{}/images/recon{}train.png'.format(self.top, self.current_epoch),
@@ -148,13 +148,18 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
 
         # Reconstruction loss
         likelihood = self.reconstruction_loss(preds, images).sum([2, 3]).view([-1]).mean()
-        self.log("likelihood", likelihood, prog_bar=True)
+        self.log("val_likelihood", likelihood, prog_bar=True)
 
         # Get the loss terms from the specific latent dynamics loss
         dynamics_loss = self.model_specific_loss()
 
         # Build the full loss
         loss = likelihood + dynamics_loss
+
+        # Log various metrics
+        self.log("val_vpt", vpt(images, preds.detach()), prog_bar=True)
+        self.log("val_pixel_mse", likelihood / (self.args.dim ** 2), prog_bar=True)
+        self.log("val_dst", dst(images, preds.detach())[1], prog_bar=True)
 
         if batch_idx == 0:
             return {"loss": loss, "preds": preds.detach(), "images": images.detach(), "embeddings": embeddings}
