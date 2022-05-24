@@ -36,6 +36,7 @@ If you found the information helpful for your work or use portions of this repo 
 - [Background](#background)
   - [What are Neural SSMs?](#neuralSSMwhat)
   - [Choice of SSM PGM](#pgmChoice)
+  - [System Controls, u<sub>t</sub>](#ssmControls)
 - [Implementation](#implementation)
   - [Data](#data)
   - [Models](#models)
@@ -72,6 +73,31 @@ The PGM associated with each approach is determined by the latent variable chose
 
 <b>System states as latent variables</b>: The intuitive choice for the latent variable is the latent state <b>z_k</b> that underlies <b>x_k</b>, given that it is already latent in the system and is directly associated with the observations. The PGM of this form is shown under Fig. 1A
 
+<!-- CONTROLS -->
+<a name="ssmControls"/>
+
+## Use of System Controls, u<sub>t</sub>
+
+Insofar we have ignored another common and important component of state-space modelling, the incorporation of external controls <i>u</i> that affect the transition function of the state. Controls represent factors that influence the trajectory of a system but are not direct features of the object/system being modelled. For example, an external force such as friction acting on a moving ball or medications given to a patient could be considered controls<sup>[8,14]</sup>. These allow an additional layer of interpretability in SSMs and even enable counterfactual reasoning; i.e. given the current state, what does its trajectory look like under varying control inputs going forwards? This has myriad uses in medical modelling with counterfactual medicine<sup>[14]</sup> or physical system simulations<sup>[8]</sup>
+<p> </p>
+For Neural SSMs, a variety of apporaches have been taken thus far. In latent dynamics still parameterized by traditional linear gaussian transition functions, control incorporation is as easy as the addition of another transition matrix <b>B<sub>t</sub></b> that modifies a control input <b>u<sub>t</sub></b> at each timestep<sup>[1,2,4,7]</sup>. In discrete non-linear transition matrices using either multi-layer perceptrons or recurrent cells, these can be leveraged by either concatenating it to the input vector before the network forward pass or as a data transformation in the form of element-wise addition and a weighted combination<sup>[10]</sup>. 
+
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/170075684-2ba31e45-b66f-4d3c-aed6-9ab28def95d6.png" alt="linear control" /></p>
+<p align='center'>Fig N. Example of control input in a linear transition function<sup>[1]<sup>.</p>
+<!-- <p> </p> -->
+
+For incorporation into continuous latent dynamics functions, finding the best approaches is an ongoing topic of interest. Thus far, the reigning approaches are:
+
+1. Directly jumping the vector field state with recurrent cells<sup>[18]</sup>
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/170078493-b7d10d50-d252-4258-bed7-f7c2ae1080b9.png" alt="jump control" /></p>
+    
+2. Influencing the vector field gradient (e.g. neural controlled differential equations)<sup>[17]</sup>
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/170079172-b2dd6376-628d-4e15-8282-4ee296cd5b89.png" alt="gradient control" /></p>
+    
+3. Introducing another dynamics mechanism, continuous or otherwise (e.g. neural ODE or attention blocks), that are combined with the latent trajectory <b>z<sub>1:T</sub></b> into an auxiliary state <b>h<sub>1:T</sub></b><sup>[8,14]</sup>.
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/170077468-f183e75f-3ad0-450e-b402-6718087c9b9c.png" alt="continuous control" /></p>
+
+    
 <!-- IMPLEMENTATION -->
 <a name="implementation"/>
 
@@ -175,3 +201,5 @@ Contributions are welcome and encouraged! If you have an implementation of a lat
 14. Zeshan Hussain, Rahul G. Krishnan, and David Sontag. Neural pharmacodynamic state space modeling, 2021.
 15. Francesco Paolo Casale, Adrian Dalca, Luca Saglietti, Jennifer Listgarten, and Nicolo Fusi.Gaussian process prior variational autoencoders. Advances in neural information processing systems, 31, 2018.
 16. Yingzhen Li and Stephan Mandt. Disentangled sequential autoencoder. arXiv preprint arXiv:1803.02991, 2018.
+17. Patrick Kidger, James Morrill, James Foster, and Terry Lyons. Neural controlled differential equations for irregular time series. Advances in Neural Information Processing Systems, 33:6696-6707, 2020.
+18. Edward De Brouwer, Jaak Simm, Adam Arany, and Yves Moreau. Gru-ode-bayes: Continuous modeling of sporadically-observed time series. Advances in neural information processing systems, 32, 2019.
