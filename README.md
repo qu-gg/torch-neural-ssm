@@ -102,7 +102,10 @@ For incorporation into continuous latent dynamics functions, finding the best ap
 <a name="implementation"/>
 
 # Implementation
-
+    
+In this section, details on model implementation and the datasets/metrics used are detailed. The models and datasets used throughout this repo are solely grayscale physics datasets with underlying Hamiltonian laws, such as pendulum and mass spring sets. Extensions to color images and non-pixel based tasks (or even graph-based data!) is easily done in this framework, as the only architecture change need is the structure of the encoder and decoder networks as the state propagation happens solely in a latent space.
+    
+    
 <!-- DATA -->
 <a name="data"/>
 
