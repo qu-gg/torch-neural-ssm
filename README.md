@@ -9,17 +9,37 @@ This repository is meant to conceptually introduce and highlight implementation 
 Included is an abstract PyTorch-Lightning training class structure with specific latent dynamic functions that inherit it, as well as common metrics used in their evaluation and training examples on common datasets. Further broken down via implementation is the distinction between <i>system identification</i> and <i>state estimation</i> approaches, which are reminiscent of their classic SSM counterparts and arise from fundamental differences in the underlying choice of probailistic graphical model (PGM).
 
 ![SavingFile](https://user-images.githubusercontent.com/32918812/169753112-bc849b24-fe13-4975-8697-fea95bb19fb5.png)
-<p align='center'>Schematic of the two PGM forms of Neural SSMs</p>
+<p align='center'>Fig 1. Schematic of the two PGM forms of Neural SSMs.</p>
+
+<!-- CITATION -->
+<a name="citation"/>
+
+## Citation
+If you found the information helpful for your work or use portions of this repo in research development, please consider citing
+```
+@misc{missel2022torchssm,
+    title={TorchSSM},
+    author={Missel, Ryan},
+    publisher={Github},
+    journal={Github repository},
+    howpublished={\url{https://github.com/qu-gg/torchssm}},
+    year={2022},
+}
+```
 
 <a name="toc"/>
 
 ## Table of Contents
 - [About](#about)
+- [Citation](#citation)
 - [Table of Contents](#toc)
 - [Background](#background)
   - [What are Neural SSMs?](#neuralSSMwhat)
   - [Choice of SSM PGM](#pgmChoice)
 - [Implementation](#implementation)
+  - [Data](#data)
+  - [Models](#models)
+  - [Metrics](#metrics)
 - [Miscellaneous](#misc)
   - [To-Do](#todo)
   - [Contributions](#contributions)
@@ -34,8 +54,8 @@ Included is an abstract PyTorch-Lightning training class structure with specific
 <a name="neuralSSMwhat"/>
 
 ## What are Neural SSMs?
-An extension of classical state-space models, they at their core consist of a dynamic function of some latent states <b>z_k</b> and their emission to observations <b>x_k</b>, realized through the equations:
-<p align='center'><img src="https://user-images.githubusercontent.com/32918812/169743189-057f52a5-8a08-4616-9516-3c60aca86b28.png" alt="centered image" /></p>
+An extension of classical state-space models, they - at their core - consist of a dynamic function of some latent states <b>z_k</b> and their emission to observations <b>x_k</b>, realized through the equations:
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/169743189-057f52a5-8a08-4616-9516-3c60aca86b28.png" alt="neural ssm equations" /></p>
 where <b>θ_z</b> represents the parameters of the latent dynamic function. The precise form of these functions can vary significantly - from deterministic or stochastic, linear or non-linear, and discrete or continuous.
 <p> </p>
 Due to their explicit differentiation of transition and emission and leveraging of structured equations, they have found success in learning interpretable latent dynamic spaces<sup>[1,2,3]</sup>, identifying physical systems from non-direct features<sup>[4,5,6]</sup> and uses in counterfactual forecasting<sup>[7,8,14]</sup>. 
@@ -55,11 +75,32 @@ The PGM associated with each approach is determined by the latent variable chose
 
 # Implementation
 
+<!-- DATA -->
+<a name="data"/>
+
 ## Data
+
+<!-- MODELS -->
+<a name="models"/>
 
 ## Models
 
+<!-- METRICS -->
+<a name="metrics"/>
+
 ## Metrics
+
+<b> Mean Squared Error (MSE)</b>: A common metric used in video and image tasks where its use is in per-frame average over individual pixel error. While a multitude of papers solely use plots of frame MSE over time as an evaluation metric, it is insufficient for comparison between models - especially in cases where the dataset contains a small object for reconstruction<sup>[4]</sup>. This is especially prominent in tasks of system identification where a model that fails to predict long-term may end up with a lower average MSE than a model that has better generation but is slightly off in its object placement. 
+
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/169945139-ebcfc6e9-14d5-4a88-bc38-a9ed41ff5dfc.png" alt="mse equation" /></p>
+<p align='center'>Fig 2. Per-Frame MSE Equation.</p>
+
+<b>Valid Prediction Time (VPT)</b>: Introduced in [4], the VPT metric is an advance on latent dynamics evaluation over pure pixel-based MSE metrics. For each prediction sequence, the per-pixel MSE is taken over the frames individually and the minimum timestep in which the MSE surpasses a pre-defined epsilon is considered the 'valid prediction time.' The resulting mean number over the samples is often normalized over the total prediction timesteps to get a percentage of valid predictions.
+
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/169942657-5208afb5-6faf-4d47-b9a2-ef0a89a5fc9f.png" alt="vpt equation" /></p>
+<p align='center'>Fig 3. Per-Sequence VPT Equation.</p>
+
+<b>Object Distance (DST)</b>:
 
 <!-- Miscellaneous -->
 <a name="misc"/>
