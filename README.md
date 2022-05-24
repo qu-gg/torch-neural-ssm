@@ -15,7 +15,7 @@ Included is an abstract PyTorch-Lightning training class structure with specific
 <a name="citation"/>
 
 ## Citation
-If you found the information helpful for your work or use portions of this repo in research development, please consider citing
+If you found the information helpful for your work or use portions of this repo in research development, please consider citing:
 ```
 @misc{missel2022torchssm,
     title={TorchSSM},
@@ -107,11 +107,18 @@ The PGM associated with each approach is determined by the latent variable chose
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/169954436-74d02fdc-0ab3-4d2e-b2b4-b595e35144a0.png" alt="dst equation" /></p>
 <p align='center'>Fig 4. Per-Frame DST Equation.</p>
 where R<sup>N</sup> is the dimension of the output (e.g. number of image channels) and s, s<sub>hat</sub> are the subsets of "active" predicted pixels.
+<p> </p>
+<b>Valid Prediction Distance (VPD)</b>: Similar in spirit to how VPT leverages MSE, VPD is the minimum timestep in which the DST metric surpasses a pre-defined epsilon. This is useful in tracking how long a model can generate an object in a physical system before either incorrect trajectories and/or error accumulation cause significant divergence.
+
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/169961714-2d007dbd-92f2-4ec7-aff0-3c383f21e919.png" alt="vpd equation" /></p>
+<p align='center'>Fig 5. Per-Sequence VPD Equation.</p>
 
 <!-- Miscellaneous -->
 <a name="misc"/>
 
 # Miscellaneous
+
+This section just consists of to-do's within the repo, contribution guidelines, and a section on how to find the references used throughout the repo.
 
 <!-- TO-DO -->
 <a name="todo"/>
@@ -133,6 +140,14 @@ where R<sup>N</sup> is the dimension of the output (e.g. number of image channel
 
 - Implement R^2 coefficient statistics from latent state to physical variables
 - Implement latent walk visualizations against data-space observations (like in DVBF)
+
+<h4>README-wise</h4>
+
+- Complete ```Introduction``` section with PGM explanations + examples
+- Complete ```Implementation``` section
+    - Data section: datasets, dataloaders, data generators, common datasets
+    - Model section: description of abstract class, PyTorch-Lightning training, dynamics class inheritance, etc
+- Add guidelines for an ```Experiment``` section highlighting experiments performed in validating the models
 
 <!-- CONTRIBUTIONS -->
 <a name="contributions"/>
