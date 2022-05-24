@@ -50,6 +50,8 @@ If you found the information helpful for your work or use portions of this repo 
 
 # Background
 
+This section gives an introduction to the concept of Neural SSMs, some common considerations and limitations, and active areas of research. This section assumes some familiarity with state-space models, though not much is required to gain a conceptual understanding if one is already coming from a latent modelling perspective or Bayesian learning. Resources are a plenty out there considering the width and depth of state-space usage, however this <a href="https://www.youtube.com/watch?v=hpeKrMG-WP0">resource</a> is a good starting point.
+
 <!-- Neural SSM INTRO -->
 <a name="neuralSSMwhat"/>
 
@@ -100,7 +102,11 @@ The PGM associated with each approach is determined by the latent variable chose
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/169942657-5208afb5-6faf-4d47-b9a2-ef0a89a5fc9f.png" alt="vpt equation" /></p>
 <p align='center'>Fig 3. Per-Sequence VPT Equation.</p>
 
-<b>Object Distance (DST)</b>:
+<b>Object Distance (DST)</b>: Another potential metric to support evaluation (useful in image-based physics forecasting tasks) is using the Euclidean distance between the estimated center of the predicted object and its ground truth center. Otsu's Thresholding <a href="https://en.wikipedia.org/wiki/Otsu%27s_method">method</a> can be applied to grayscale output images to get binary predictions of each pixel and then the average pixel location of all the "active" pixels can be calculated. This approach can help alleviate the prior MSE issues of metric imbalance as the maximum Euclidean error of a given image space can be applied to model predictions that fail to have any pixels over Otsu's threshold.
+
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/169954436-74d02fdc-0ab3-4d2e-b2b4-b595e35144a0.png" alt="dst equation" /></p>
+<p align='center'>Fig 4. Per-Frame DST Equation.</p>
+where R<sup>N</sup> is the dimension of the output (e.g. number of image channels) and s, s<sub>hat</sub> are the subsets of "active" predicted pixels.
 
 <!-- Miscellaneous -->
 <a name="misc"/>
