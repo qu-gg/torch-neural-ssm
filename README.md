@@ -80,13 +80,23 @@ The PGM associated with each approach is determined by the latent variable chose
 
 Insofar we have ignored another common and important component of state-space modelling, the incorporation of external controls <i>u</i> that affect the transition function of the state. Controls represent factors that influence the trajectory of a system but are not direct features of the object/system being modelled. For example, an external force such as friction acting on a moving ball or medications given to a patient could be considered controls<sup>[8,14]</sup>. These allow an additional layer of interpretability in SSMs and even enable counterfactual reasoning; i.e. given the current state, what does its trajectory look like under varying control inputs going forwards? This has myriad uses in medical modelling with counterfactual medicine<sup>[14]</sup> or physical system simulations<sup>[8]</sup>
 <p> </p>
-For Neural SSMs, a variety of apporaches have been taken thus far. In latent dynamics still parameterized by traditional linear gaussian transition functions, control incorporation is as easy as the addition of another transition matrix <b>B<sub>t</sub></b> that modifies a control input <b>u<sub>t</sub></b> at each timestep<sup>[1,2,4,7]</sup>. In discrete non-linear transition matrices using either multi-layer perceptrons or recurrent cells, these can be leveraged by either concatenating it to the input vector before the network forward pass or as a data transformation in the form of element-wise addition and a weighted combination<sup>[10]</sup>. 
+
+For Neural SSMs, a variety of approaches have been taken thus far dependent on the type of latent transition function utilized. 
+<p> </p>
+
+<b>Linear Dynamics</b>: In latent dynamics still parameterized by traditional linear gaussian transition functions, control incorporation is as easy as the addition of another transition matrix <b>B<sub>t</sub></b> that modifies a control input <b>u<sub>t</sub></b> at each timestep<sup>[1,2,4,7]</sup>. 
 
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/170075684-2ba31e45-b66f-4d3c-aed6-9ab28def95d6.png" alt="linear control" /></p>
 <p align='center'>Fig N. Example of control input in a linear transition function<sup>[1]<sup>.</p>
-<!-- <p> </p> -->
+<p> </p>
 
-For incorporation into continuous latent dynamics functions, finding the best approaches is an ongoing topic of interest. Thus far, the reigning approaches are:
+<b>Non-Linear Dynamics</b>: In discrete non-linear transition matrices using either multi-layer perceptrons or recurrent cells, these can be leveraged by either concatenating it to the input vector before the network forward pass or as a data transformation in the form of element-wise addition and a weighted combination<sup>[10]</sup>. 
+
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/170173582-a8158240-62d0-4b7e-8793-d1c796bc4a6c.png" alt="non-linear control" /></p>
+<p align='center'>Fig N. Example of control input in a non-linear transition function<sup>[1]<sup>.</p>
+<p> </p>
+
+<b>Continuous Dynamics</b>: For incorporation into continuous latent dynamics functions, finding the best approaches is an ongoing topic of interest. Thus far, the reigning approaches are:
 
 1. Directly jumping the vector field state with recurrent cells<sup>[18]</sup>
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/170078493-b7d10d50-d252-4258-bed7-f7c2ae1080b9.png" alt="jump control" /></p>
