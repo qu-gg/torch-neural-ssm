@@ -120,7 +120,33 @@ In this section, details on model implementation and the datasets/metrics used a
 <a name="data"/>
 
 ## Data
+    
+<b>Hamiltonian Dymamics</b>: Provided for evaluation is a <a href="https://github.com/webdataset/webdataset">WebDataset</a> dataloader and generation scripts for DeepMind's Hamiltonian Dynamics 
+<a href="https://github.com/deepmind/dm_hamiltonian_dynamics_suite">suite</a><sup>[4]</sup>, a simulaton library for 17 different physics datasets that have known underlying Hamiltonian dynamics. 
+It comes in the form of color image sequences of arbitrary length, coupled with the systems ground truth states (e.g. for pendulum, angular velocity and angle). It is well-benchmarked and customizable, making it a perfect testbed for latent dynamics function evaluation. For each setting, the physical parameters are tweakable alongside an optional friction coefficient to construct non-energy conserving systems. Location of focal points and color of the object are all individually tuneable, enabling mixed and complex visual datasets of varying latent dynamics.
 
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/171246437-0a1ef292-f90c-4fb7-beb3-82a5e74bb549.gif" alt="pendulum examples" /></p>
+<p align='center'>Fig N. Pendulum-Colors Examples</p>
+
+For the base presented experiments of this dataset, we consider and evaluate grayscale versions of pendulum and mass spring - which conveniently are just the sliced red channel of the original sets. Each set has `20000` training and `2000` testing trajectories sampled at `Δt = 0.05` intervals. Energy conservation is preserved without friction and we assume constant placement of focal points for simplicity. Note that the modification to color outputs in this framework is as simple as modifying the number of channels in the encoder and decoder.
+
+<p> </p>
+<b>Bouncing Balls</b>: Additionally, we provide a dataloader and generation scripts for the standard latent dynamics dataset of bouncing balls<sup>[1,2,5,7,8]</sup>, modified from the implementation in <a href="https://github.com/simonkamronn/kvae/tree/master/kvae/datasets">[1]</a>. It consists of a ball or multiple balls moving within a bounding box while being affected by a number of potential external effects, e.g. gravitational forces<sup>[1,2,5]</sup>, pong<sup>[2]</sup>, interventions<sup>[8]</sup>. The starting positon, angle, and velocity of the ball(s) are sampled uniformly between a set range. It is generated with the <a href="https://github.com/viblo/pymunk">PyMunk</a> and <a href="https://www.pygame.org/news">PyGame</a> libraries. In this repository we consider two sets - a simple set of one gravitational force and a mixed set of 4 gravitational forces in the cardinal directions with varying strengths. We similarly generate `20000` training and `2000` testing trajectories, however sampled at `Δt = 0.1` intervals.
+<p> </p>
+Notably, this dataset is surprisingly difficult to successfully perform long-term generation on, especially in cases of mixed gravities or multiple objects. Most works only report on generation within 5-15 timesteps following a period of 3-5 observation timesteps<sup>[1,2,7]</sup> and farther timesteps show lost trajectories and/or incoherent reconstructions.
+    
+<p> </p>
+<b>Mixing Physics</b>: So far in literature, the majority of works only consider training Neural SSMs on one system of dynamics at a time - with the most variety lying in that of differing trajectory hyper-parameters. The ability to infer multiple dynamical systems under one model (or learn to output dynamical functions given system observations) and leverage similarities between the sets is an ongoing research pursuit - with applications of neural unit hypernetworks<sup>[ICML MetaPrior]</sup> and dynamics functions conditioned on sequences via meta-learning<sup>NeurIPS MetaSSM</sup> being the first dives into this.
+    
+<p> </p>
+<b>Other Sets in Literature</b>: 
+<ul>
+    <li>Rotating MNIST</li>
+    <li>Human Motion Prediction (AMASS, Human3.6M, Weizzman)</li>
+    <li>Lower-dimensional (M4, ETT, UAV, Turbofan)</li>
+    <li></li>
+</ul>
+    
 <!-- MODELS -->
 <a name="models"/>
 
