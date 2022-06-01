@@ -65,7 +65,7 @@ class NeuralODE(LatentDynamicsModel):
 
         # Stack zt and decode zts
         x_rec = self.decoder(zt.contiguous().view([zt.shape[0] * zt.shape[1], -1]))
-        return x_rec
+        return x_rec, zt
 
     @staticmethod
     def add_model_specific_args(parent_parser):

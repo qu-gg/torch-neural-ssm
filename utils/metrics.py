@@ -6,6 +6,7 @@ Valid Prediction Time (VPT), Valid Prediction Distance (VPD), etc.
 """
 import numpy as np
 from skimage.filters import threshold_otsu
+from sklearn.linear_model import LinearRegression
 
 
 def vpt(gt, preds, epsilon=0.010):
@@ -114,3 +115,30 @@ def dst(gt, preds):
             results[n, t] = dist
 
     return results, np.mean(results)
+
+
+def r2fit(latents, gt_state):
+    """
+    Computes an R^2 fit value for each ground truth physical state dimension given the latent states at each timestep.
+    Gets an average per timestep.
+    :param latents: latent states at each timestep [BatchSize, TimeSteps, LatentSize]
+    :param gt_state: ground truth physical parameters [BatchSize, TimeSteps, StateSize]
+    """
+    r2s = []
+
+    # Ensure on CPU and numpy
+    latents = latents.cpu().numpy()
+    gt_state = gt_state.cpu().numpy()
+
+    # Convert to one large set of latent states
+    latents = latents.reshape([latents.shape[0] * latents.shape[1], -1])
+    gt_state = gt_state.reshape([gt_state.shape[0] * gt_state.shape[1], -1])
+
+    # For each dimension of gt_state, get the R^2 value
+    for sidx in range(gt_state.shape[-1]):
+        gts = gt_state[:, sidx]
+        reg = LinearRegression().fit(latents, gts)
+        r2s.append(reg.score(latents, gts))
+
+    # Return r2s for logging
+    return r2s

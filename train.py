@@ -14,28 +14,23 @@ from utils.utils import get_exp_versions, get_model
 class Dataset(pytorch_lightning.LightningDataModule):
     def __init__(self, args, batch_size=32, workers=0):
         super(Dataset, self).__init__()
+        shard_size = (args.dataset_size // 10) - 1
 
         bucket = "data/{}/{}/train_tars/".format(args.dataset, args.dataset_ver)
-        shards = "{000..999}.tar"
+        shards = "{000.." + str(shard_size) + "}.tar"
         self.training_urls = os.path.join(bucket, shards)
         print(self.training_urls)
 
         bucket = "data/{}/{}/test_tars/".format(args.dataset, args.dataset_ver)
-        shards = "{000..999}.tar"
+        shards = "{000.." + str(shard_size) + "}.tar"
         self.validation_urls = os.path.join(bucket, shards)
 
-        self.length = 10000 // batch_size
-
+        self.length = args.dataset_size // batch_size
         self.batch_size = batch_size
         self.num_workers = workers
 
     def make_loader(self, urls, mode="train"):
-        if mode == "train":
-            dataset_size = 10000
-            shuffle = 1000
-        else:
-            dataset_size = 2000
-            shuffle = 0
+        shuffle = 1000 if mode == "train" else 0
 
         dataset = (
             wds.WebDataset(urls, shardshuffle=True)
@@ -52,7 +47,7 @@ class Dataset(pytorch_lightning.LightningDataModule):
             num_workers=self.num_workers
         )
 
-        loader.length = dataset_size // self.batch_size
+        loader.length = self.length
         loader.unbatched().shuffle(1000).batched(self.batch_size)
         return loader
 
@@ -69,18 +64,19 @@ def parse_args():
 
     # Experiment ID
     parser.add_argument('--exptype', type=str, default='pendulum', help='experiment folder name')
-    parser.add_argument('--checkpt', type=str, default='None', help='checkpoint to resume training from')
+    parser.add_argument('--checkpt', type=str, default='42', help='checkpoint to resume training from')
     parser.add_argument('--model', type=str, default='node', help='which model to use for training')
 
     # Dataset-to-use parameters
     parser.add_argument('--dataset', type=str, default='pendulum', help='dataset name for training')
     parser.add_argument('--dataset_ver', type=str, default='pendulum_10000samples_65steps',
                         help='dataset version for training')
+    parser.add_argument('--dataset_size', type=int, default=10000, help='dataset name for training')
 
     # Learning parameters
     parser.add_argument('--num_epochs', type=int, default=200, help='number of epochs to run over')
-    parser.add_argument('--batch_size', type=int, default=16, help='size of batch')
-    parser.add_argument('--learning_rate', type=float, default=1e-3, help='initial learning rate')
+    parser.add_argument('--batch_size', type=int, default=32, help='size of batch')
+    parser.add_argument('--learning_rate', type=float, default=5e-4, help='initial learning rate')
 
     # Tuning parameters
     parser.add_argument('--z0_beta', type=float, default=0.1, help='multiplier for z0 term in loss')
@@ -90,7 +86,7 @@ def parse_args():
     parser.add_argument('--dim', type=int, default=32, help='dimension of the image data')
 
     # Latent network dimensions
-    parser.add_argument('--latent_dim', type=int, default=64, help='latent dimension size')
+    parser.add_argument('--latent_dim', type=int, default=16, help='latent dimension size')
     parser.add_argument('--num_layers', type=int, default=4, help='number of layers in the ODE func')
     parser.add_argument('--num_hidden', type=int, default=250, help='number of nodes per layer in ODE func')
 

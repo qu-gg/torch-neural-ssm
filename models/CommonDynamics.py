@@ -11,7 +11,7 @@ import numpy as np
 import torch.nn as nn
 import pytorch_lightning
 
-from utils.metrics import vpt, dst
+from utils.metrics import vpt, dst, r2fit
 from utils.plotting import show_images
 from models.CommonVAE import LatentStateEncoder, EmissionDecoder
 
@@ -77,19 +77,24 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         """
         # Stack batch and restrict to generation length
         images = torch.stack([b['image'] for b in batch[0]])
+        states = torch.stack([b['x'] for b in batch[0]]).squeeze(1)
         images = images[:, :self.args.generation_len]
+        states = states[:, :self.args.generation_len]
 
         # Get predictions
         output = self(images)
-        preds, embeddings = output if len(output) > 1 else output, None
+        if len(output) == 2:
+            preds, embeddings = output[0], output[1]
+        else:
+            preds, embeddings = output, None
 
         # Reconstruction loss
         likelihood = self.reconstruction_loss(preds, images).sum([2, 3]).view([-1]).mean()
-        self.log("likelihood", likelihood, prog_bar=True)
+        self.log("likelihood", likelihood, prog_bar=True, on_epoch=True, on_step=False)
 
         # Initial encoder loss
         klz = self.encoder.kl_z_term()
-        self.log("klz_loss", self.args.z0_beta * klz, prog_bar=True)
+        self.log("klz_loss", self.args.z0_beta * klz, prog_bar=True, on_epoch=True, on_step=False)
 
         # Get the loss terms from the specific latent dynamics loss
         dynamics_loss = self.model_specific_loss()
@@ -98,15 +103,16 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         loss = likelihood + (self.args.z0_beta * klz) + dynamics_loss
 
         # Log various metrics
-        self.log("train_vpt", vpt(images, preds.detach()), prog_bar=True)
-        self.log("train_pixel_mse", likelihood / (self.args.dim ** 2), prog_bar=True)
-        self.log("train_dst", dst(images, preds.detach())[1], prog_bar=True)
+        self.log("train_vpt", vpt(images, preds.detach()), prog_bar=True, on_epoch=True, on_step=False)
+        self.log("train_pixel_mse", likelihood / (self.args.dim ** 2), prog_bar=True, on_epoch=True, on_step=False)
+        self.log("train_dst", dst(images, preds.detach())[1], prog_bar=True, on_epoch=True, on_step=False)
 
         # Return outputs as dict
+        out = {"loss": loss, "states": states.detach(), "embeddings": embeddings.detach()}
         if batch_idx >= self.last_train_idx - 25:
-            return {"loss": loss, "preds": preds.detach(), "images": images.detach(), "emebeddings": embeddings}
-        else:
-            return {"loss": loss}
+            out["preds"] = preds.detach()
+            out["images"] = images.detach()
+        return out
 
     def training_epoch_end(self, outputs):
         """
@@ -125,6 +131,18 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
                         'lightning_logs/version_{}/images/recon{}train.png'.format(self.top, self.current_epoch),
                         num_out=5)
 
+            # Get R^2 over training set
+            embeddings, states = [], []
+            for out in outputs:
+                embeddings.append(out['embeddings'])
+                states.append(out['states'])
+            embeddings, states = torch.vstack(embeddings), torch.vstack(states)
+            r2s = r2fit(embeddings, states)
+
+            # Log each dimension's R2 individually
+            for idx, r in enumerate(r2s):
+                self.log("train_r2_{}".format(idx), r, prog_bar=True)
+
             # Copy experiment to relevant folder
             if self.args.exptype is not None:
                 if os.path.exists("experiments/{}/{}/version_{}".format(self.args.model, self.args.exptype, self.exptop)):
@@ -140,15 +158,20 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         """
         # Stack batch and restrict to generation length
         images = torch.stack([b['image'] for b in batch[0]])
+        states = torch.stack([b['x'] for b in batch[0]]).squeeze(1)
         images = images[:, :self.args.generation_len]
+        states = states[:, :self.args.generation_len]
 
         # Get predictions
         output = self(images)
-        preds, embeddings = output if len(output) > 1 else output, None
+        if len(output) == 2:
+            preds, embeddings = output[0], output[1]
+        else:
+            preds, embeddings = output, None
 
         # Reconstruction loss
         likelihood = self.reconstruction_loss(preds, images).sum([2, 3]).view([-1]).mean()
-        self.log("val_likelihood", likelihood, prog_bar=True)
+        self.log("val_likelihood", likelihood, prog_bar=True, on_epoch=True, on_step=False)
 
         # Get the loss terms from the specific latent dynamics loss
         dynamics_loss = self.model_specific_loss()
@@ -157,14 +180,16 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         loss = likelihood + dynamics_loss
 
         # Log various metrics
-        self.log("val_vpt", vpt(images, preds.detach()), prog_bar=True)
-        self.log("val_pixel_mse", likelihood / (self.args.dim ** 2), prog_bar=True)
-        self.log("val_dst", dst(images, preds.detach())[1], prog_bar=True)
+        self.log("val_vpt", vpt(images, preds.detach()), prog_bar=True, on_epoch=True, on_step=False)
+        self.log("val_pixel_mse", likelihood / (self.args.dim ** 2), prog_bar=True, on_epoch=True, on_step=False)
+        self.log("val_dst", dst(images, preds.detach())[1], prog_bar=True, on_epoch=True, on_step=False)
 
+        # Return outputs as dict
+        out = {"loss": loss, "states": states.detach(), "embeddings": embeddings.detach()}
         if batch_idx == 0:
-            return {"loss": loss, "preds": preds.detach(), "images": images.detach(), "embeddings": embeddings}
-        else:
-            return {"loss"}
+            out["preds"] = preds.detach()
+            out["images"] = images.detach()
+        return out
 
     def validation_epoch_end(self, outputs):
         """
@@ -182,6 +207,18 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
             show_images(outputs[0]["images"], outputs[0]["preds"],
                         'lightning_logs/version_{}/images/recon{}val.png'.format(self.top, self.current_epoch),
                         num_out=5)
+
+            # Get R^2 over validation set
+            embeddings, states = [], []
+            for out in outputs:
+                embeddings.append(out['embeddings'])
+                states.append(out['states'])
+            embeddings, states = torch.vstack(embeddings), torch.vstack(states)
+            r2s = r2fit(embeddings, states)
+
+            # Log each dimension's R2 individually
+            for idx, r in enumerate(r2s):
+                self.log("val_r2_{}".format(idx), r, prog_bar=True, on_epoch=True, on_step=False)
 
     def test_step(self, batch, batch_idx):
         """
