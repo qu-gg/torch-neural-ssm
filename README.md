@@ -139,19 +139,20 @@ Notably, this dataset is surprisingly difficult to successfully perform long-ter
 <b>Mixing Physics</b>: So far in literature, the majority of works only consider training Neural SSMs on one system of dynamics at a time - with the most variety lying in that of differing trajectory hyper-parameters. The ability to infer multiple dynamical systems under one model (or learn to output dynamical functions given system observations) and leverage similarities between the sets is an ongoing research pursuit - with applications of neural unit hypernetworks<sup>[ICML MetaPrior]</sup> and dynamics functions conditioned on sequences via meta-learning<sup>NeurIPS MetaSSM</sup> being the first dives into this.
     
 <p> </p>
-<b>Other Sets in Literature</b>: 
-<ul>
-    <li>Rotating MNIST</li>
-    <li>Human Motion Prediction (AMASS, Human3.6M, Weizzman)</li>
-    <li>Lower-dimensional (M4, ETT, UAV, Turbofan)</li>
-    <li></li>
-</ul>
-    
+<b>Other Sets in Literature</b>: Outside of the previous sets, there are a plethora of other datasets that have been explored in relevant work. The popular task of human motion prediction in both the pose estimation and video generation setting have been considered via datasets Human3.6Mil, CMU Mocap, and Weizzman-Action<sup>[5,19]</sup>, though proper experimentation into this area would require problem-specific architectures given the depth of the existing field. Past high-dimensionality and image-space, standard benchmark datasets in time-series forecasting have also been considered, including the <a href="https://github.com/Mcompetitions/M4-methods">M4</a>, <a href="https://github.com/zhouhaoyi/ETDataset">Electricity Transformer Temperature (ETT)</a>, and <a href="https://www.nasa.gov/intelligent-systems-division">the NASA Turbofan Degredation</a> set. Recent works have begun looking at medical applications in inverse image reconstruction and the incorporation of physics-inspired priors<sup>[20]</sup>. Regardless of the success of Neural SSMs on these tasks, the task-agnostic aspect and principled structure of this framework makes it a versatile and appealing option for generative time-series modelling. 
+
+
 <!-- MODELS -->
 <a name="models"/>
-
+    
 ## Models
 
+<ul>
+    <li>VAE Considerations (Stochastic/Deterministic, CNN/MLP/GNN/GCNN/RNN)</li>
+    <li>Latent Dynamics functions (Stochastic/Deterministic, System Identification/State Estimation, Linear/Non-Linear)</li>
+    <li>Available models in this repo (RGN, RGN-Res, GRU, LSTM, NODE, etc)</li>
+</ul>
+    
 <!-- METRICS -->
 <a name="metrics"/>
 
@@ -251,3 +252,5 @@ Contributions are welcome and encouraged! If you have an implementation of a lat
 16. Yingzhen Li and Stephan Mandt. Disentangled sequential autoencoder. arXiv preprint arXiv:1803.02991, 2018.
 17. Patrick Kidger, James Morrill, James Foster, and Terry Lyons. Neural controlled differential equations for irregular time series. Advances in Neural Information Processing Systems, 33:6696-6707, 2020.
 18. Edward De Brouwer, Jaak Simm, Adam Arany, and Yves Moreau. Gru-ode-bayes: Continuous modeling of sporadically-observed time series. Advances in neural information processing systems, 32, 2019.
+19. Ruben Villegas, Jimei Yang, Yuliang Zou, Sungryull Sohn, Xunyu Lin, and Honglak Lee. Learning to generate long-term future via hierarchical prediction. In international conference on machine learning, pages 3560–3569. PMLR, 2017
+20. Xiajun Jiang, Ryan Missel, Maryam Toloubidokhti, Zhiyuan Li, Omar Gharbia, John L Sapp, and Linwei Wang. Label-free physics-informed image sequence reconstruction with disentangled spatial-temporal modeling. In International Conference on Medical Image Computing and Computer-Assisted Intervention, pages 361–371. Springer, 2021.
