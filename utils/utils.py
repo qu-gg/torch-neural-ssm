@@ -15,6 +15,9 @@ def get_model(name):
     elif name == "lstm":
         from models.LSTM import LSTM
         return LSTM
+    elif name == "rgn":
+        from models.RGN import RGN
+        return RGN
     else:
         raise NotImplementedError("Model type {} not implemented.".format(name))
 

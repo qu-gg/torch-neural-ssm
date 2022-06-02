@@ -137,7 +137,14 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
                 embeddings.append(out['embeddings'])
                 states.append(out['states'])
             embeddings, states = torch.vstack(embeddings), torch.vstack(states)
-            r2s = r2fit(embeddings, states)
+
+            # Get polar coordinates (sin and cos) of the angle for evaluation
+            sins = torch.sin(states[:, :, 0])
+            coss = torch.cos(states[:, :, 0])
+            states = torch.stack((sins, coss, states[:, :, 1]), dim=2)
+
+            # Get r2 score
+            r2s = r2fit(embeddings, states, mlp=True)
 
             # Log each dimension's R2 individually
             for idx, r in enumerate(r2s):
@@ -214,7 +221,14 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
                 embeddings.append(out['embeddings'])
                 states.append(out['states'])
             embeddings, states = torch.vstack(embeddings), torch.vstack(states)
-            r2s = r2fit(embeddings, states)
+
+            # Get polar coordinates (sin and cos) of the angle for evaluation
+            sins = torch.sin(states[:, :, 0])
+            coss = torch.cos(states[:, :, 0])
+            states = torch.stack((sins, coss, states[:, :, 1]), dim=2)
+
+            # Get r2 score
+            r2s = r2fit(embeddings, states, mlp=True)
 
             # Log each dimension's R2 individually
             for idx, r in enumerate(r2s):

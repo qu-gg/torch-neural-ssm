@@ -14,7 +14,7 @@ from utils.utils import get_exp_versions, get_model
 class Dataset(pytorch_lightning.LightningDataModule):
     def __init__(self, args, batch_size=32, workers=0):
         super(Dataset, self).__init__()
-        shard_size = (args.dataset_size // 10) - 1
+        shard_size = (args.dataset_size // 50) - 1
 
         bucket = "data/{}/{}/train_tars/".format(args.dataset, args.dataset_ver)
         shards = "{000.." + str(shard_size) + "}.tar"
@@ -64,14 +64,14 @@ def parse_args():
 
     # Experiment ID
     parser.add_argument('--exptype', type=str, default='pendulum', help='experiment folder name')
-    parser.add_argument('--checkpt', type=str, default='42', help='checkpoint to resume training from')
-    parser.add_argument('--model', type=str, default='node', help='which model to use for training')
+    parser.add_argument('--checkpt', type=str, default='None', help='checkpoint to resume training from')
+    parser.add_argument('--model', type=str, default='lstm', help='which model to use for training')
 
     # Dataset-to-use parameters
     parser.add_argument('--dataset', type=str, default='pendulum', help='dataset name for training')
-    parser.add_argument('--dataset_ver', type=str, default='pendulum_10000samples_65steps',
+    parser.add_argument('--dataset_ver', type=str, default='pendulum_50000samples_65steps',
                         help='dataset version for training')
-    parser.add_argument('--dataset_size', type=int, default=10000, help='dataset name for training')
+    parser.add_argument('--dataset_size', type=int, default=50000, help='dataset name for training')
 
     # Learning parameters
     parser.add_argument('--num_epochs', type=int, default=200, help='number of epochs to run over')
@@ -87,8 +87,9 @@ def parse_args():
 
     # Latent network dimensions
     parser.add_argument('--latent_dim', type=int, default=16, help='latent dimension size')
-    parser.add_argument('--num_layers', type=int, default=4, help='number of layers in the ODE func')
-    parser.add_argument('--num_hidden', type=int, default=250, help='number of nodes per layer in ODE func')
+    parser.add_argument('--num_layers', type=int, default=4, help='number of layers in the dynamics func')
+    parser.add_argument('--num_hidden', type=int, default=250, help='number of nodes per layer in dynamics func')
+    parser.add_argument('--latent_act', type=str, default="leaky_relu", help='type of act func in dynamics func')
 
     # Convolutional dimensions
     parser.add_argument('--z_amort', type=int, default=5, help='how many X samples to use in z0 inference')
