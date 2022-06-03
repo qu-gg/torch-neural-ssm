@@ -182,7 +182,6 @@ if __name__ == '__main__':
     fig = plt.figure()
     animation = FuncAnimation(fig, func, frames=200, interval=30)
     animation.save("output.gif", writer='ffmpeg', fps=60)
-    exit(0)
 
     # Permute the sets and states together
     p = np.random.permutation(train_images.shape[0])
