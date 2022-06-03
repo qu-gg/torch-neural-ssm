@@ -1,19 +1,19 @@
 <h2 align='center'>torchssm</h2>
 <h3 align='center'>Neural State-Space Models and Latent Dynamic Functions <br> for High-Dimensional Generative Time-series Modelling</h3>
 
-<a name="about"/>
-
+<a name="about"></a>
 ## About this Repository
+
 This repository is meant to conceptually introduce and highlight implementation considerations for the recent class of models called <b>Neural State-Space Models (Neural SSMs)</b>. They leverage the classical state-space models with the flexibility of deep learning to approach high-dimensional generative time-series modelling and learning latent dynamics functions.
 
-Included is an abstract PyTorch-Lightning training class structure with specific latent dynamic functions that inherit it, as well as common metrics used in their evaluation and training examples on common datasets. Further broken down via implementation is the distinction between <i>system identification</i> and <i>state estimation</i> approaches, which are reminiscent of their classic SSM counterparts and arise from fundamental differences in the underlying choice of probailistic graphical model (PGM).
+Included is an abstract PyTorch-Lightning training class structure with specific latent dynamic functions that inherit it, as well as common metrics used in their evaluation and training examples on common datasets. Further broken down via implementation is the distinction between <i>system identification</i> and <i>state estimation</i> approaches, which are reminiscent of their classic SSM counterparts and arise from fundamental differences in the underlying choice of probabilistic graphical model (PGM).
 
-![SavingFile](https://user-images.githubusercontent.com/32918812/169753112-bc849b24-fe13-4975-8697-fea95bb19fb5.png)
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/169753112-bc849b24-fe13-4975-8697-fea95bb19fb5.png" alt="pgm schematic" /></p>
 <p align='center'>Fig 1. Schematic of the two PGM forms of Neural SSMs.</p>
 
-<!-- CITATION -->
-<a name="citation"/>
 
+<!-- CITATION -->
+<a name="citation"></a>
 ## Citation
 If you found the information helpful for your work or use portions of this repo in research development, please consider citing:
 ```
@@ -27,8 +27,7 @@ If you found the information helpful for your work or use portions of this repo 
 }
 ```
 
-<a name="toc"/>
-
+<a name="toc"></a>
 ## Table of Contents
 - [About](#about)
 - [Citation](#citation)
@@ -47,50 +46,46 @@ If you found the information helpful for your work or use portions of this repo 
   - [References](#references)
 
 <!-- BACKGROUND -->
-<a name="background"/>
-
+<a name="background"></a>
 # Background
 
 This section gives an introduction to the concept of Neural SSMs, some common considerations and limitations, and active areas of research. This section assumes some familiarity with state-space models, though not much is required to gain a conceptual understanding if one is already coming from a latent modelling perspective or Bayesian learning. Resources are a plenty out there considering the width and depth of state-space usage, however this <a href="https://www.youtube.com/watch?v=hpeKrMG-WP0">resource</a> is a good starting point.
 
 <!-- Neural SSM INTRO -->
-<a name="neuralSSMwhat"/>
-
+<a name="neuralSSMwhat"></a>
 ## What are Neural SSMs?
 An extension of classical state-space models, they - at their core - consist of a dynamic function of some latent states <b>z_k</b> and their emission to observations <b>x_k</b>, realized through the equations:
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/169743189-057f52a5-8a08-4616-9516-3c60aca86b28.png" alt="neural ssm equations" /></p>
 where <b>θ_z</b> represents the parameters of the latent dynamic function. The precise form of these functions can vary significantly - from deterministic or stochastic, linear or non-linear, and discrete or continuous.
 <p> </p>
-Due to their explicit differentiation of transition and emission and leveraging of structured equations, they have found success in learning interpretable latent dynamic spaces<sup>[1,2,3]</sup>, identifying physical systems from non-direct features<sup>[4,5,6]</sup> and uses in counterfactual forecasting<sup>[7,8,14]</sup>. 
+Due to their explicit differentiation of transition and emission and leveraging of structured equations, they have found success in learning interpretable latent dynamic spaces<sup>[1,2,3]</sup>, identifying physical systems from non-direct features<sup>[4,5,6]</sup> and uses in counterfactual forecasting<sup>[7,8,14]</sup>.
 <p> </p>
 Given the fast pace of progress in latent dynamics modelling over recent years, many models have been presented under a variety of terminologies and proposed frameworks - examples being variational latent recurrent models<sup>[5,9,10,11,12]</sup>, deep state space models<sup>[1,2,3,7,13,14]</sup>, and deterministic encoding-decoding models<sup>[4,15,16]</sup>. Despite differences in appearance, they all adhere to the same conceptual framework of latent variable modelling and state-space disentanglement. As such, here we unify them under the term of Neural SSMs and segment them into the two base choices of probabilistic graphical models that they adhere to: <i>system identification</i> and <i>state estimation</i>. We highlight each PGM's properties and limitations with experimental evaluations on benchmark datasets.
 
 <!-- PGM CHOICES -->
-<a name="pgmChoice"/>
-
+<a name="pgmChoice"></a>
 ## Choice of PGM - System Identification vs State Estimation
 The PGM associated with each approach is determined by the latent variable chosen for inference.
 
 <b>System states as latent variables</b>: The intuitive choice for the latent variable is the latent state <b>z_k</b> that underlies <b>x_k</b>, given that it is already latent in the system and is directly associated with the observations. The PGM of this form is shown under Fig. 1A
 
 <!-- CONTROLS -->
-<a name="ssmControls"/>
-
+<a name="ssmControls"></a>
 ## Use of System Controls, u<sub>t</sub>
 
 Insofar we have ignored another common and important component of state-space modelling, the incorporation of external controls <i>u</i> that affect the transition function of the state. Controls represent factors that influence the trajectory of a system but are not direct features of the object/system being modelled. For example, an external force such as friction acting on a moving ball or medications given to a patient could be considered controls<sup>[8,14]</sup>. These allow an additional layer of interpretability in SSMs and even enable counterfactual reasoning; i.e. given the current state, what does its trajectory look like under varying control inputs going forwards? This has myriad uses in medical modelling with counterfactual medicine<sup>[14]</sup> or physical system simulations<sup>[8]</sup>
 <p> </p>
 
-For Neural SSMs, a variety of approaches have been taken thus far dependent on the type of latent transition function utilized. 
+For Neural SSMs, a variety of approaches have been taken thus far dependent on the type of latent transition function utilized.
 <p> </p>
 
-<b>Linear Dynamics</b>: In latent dynamics still parameterized by traditional linear gaussian transition functions, control incorporation is as easy as the addition of another transition matrix <b>B<sub>t</sub></b> that modifies a control input <b>u<sub>t</sub></b> at each timestep<sup>[1,2,4,7]</sup>. 
+<b>Linear Dynamics</b>: In latent dynamics still parameterized by traditional linear gaussian transition functions, control incorporation is as easy as the addition of another transition matrix <b>B<sub>t</sub></b> that modifies a control input <b>u<sub>t</sub></b> at each timestep<sup>[1,2,4,7]</sup>.
 
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/170075684-2ba31e45-b66f-4d3c-aed6-9ab28def95d6.png" alt="linear control" /></p>
 <p align='center'>Fig N. Example of control input in a linear transition function<sup>[1]<sup>.</p>
 <p> </p>
 
-<b>Non-Linear Dynamics</b>: In discrete non-linear transition matrices using either multi-layer perceptrons or recurrent cells, these can be leveraged by either concatenating it to the input vector before the network forward pass or as a data transformation in the form of element-wise addition and a weighted combination<sup>[10]</sup>. 
+<b>Non-Linear Dynamics</b>: In discrete non-linear transition matrices using either multi-layer perceptrons or recurrent cells, these can be leveraged by either concatenating it to the input vector before the network forward pass or as a data transformation in the form of element-wise addition and a weighted combination<sup>[10]</sup>.
 
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/170173582-a8158240-62d0-4b7e-8793-d1c796bc4a6c.png" alt="non-linear control" /></p>
 <p align='center'>Fig N. Example of control input in a non-linear transition function<sup>[1]<sup>.</p>
@@ -100,29 +95,27 @@ For Neural SSMs, a variety of approaches have been taken thus far dependent on t
 
 1. Directly jumping the vector field state with recurrent cells<sup>[18]</sup>
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/170078493-b7d10d50-d252-4258-bed7-f7c2ae1080b9.png" alt="jump control" /></p>
-    
+
 2. Influencing the vector field gradient (e.g. neural controlled differential equations)<sup>[17]</sup>
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/170079172-b2dd6376-628d-4e15-8282-4ee296cd5b89.png" alt="gradient control" /></p>
-    
+
 3. Introducing another dynamics mechanism, continuous or otherwise (e.g. neural ODE or attention blocks), that are combined with the latent trajectory <b>z<sub>1:T</sub></b> into an auxiliary state <b>h<sub>1:T</sub></b><sup>[8,14]</sup>.
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/170077468-f183e75f-3ad0-450e-b402-6718087c9b9c.png" alt="continuous control" /></p>
 
-    
+
 <!-- IMPLEMENTATION -->
-<a name="implementation"/>
-
+<a name="implementation"></a>
 # Implementation
-    
-In this section, details on model implementation and the datasets/metrics used are detailed. The models and datasets used throughout this repo are solely grayscale physics datasets with underlying Hamiltonian laws, such as pendulum and mass spring sets. Extensions to color images and non-pixel based tasks (or even graph-based data!) is easily done in this framework, as the only architecture change need is the structure of the encoder and decoder networks as the state propagation happens solely in a latent space.
-    
-    
-<!-- DATA -->
-<a name="data"/>
 
+In this section, details on model implementation and the datasets/metrics used are detailed. Specific data generation details are available in the URLs provided for each dataset. The models and datasets used throughout this repo are solely grayscale physics datasets with underlying Hamiltonian laws, such as pendulum and mass spring sets. Extensions to color images and non-pixel based tasks (or even graph-based data!) is easily done in this framework, as the only architecture change need is the structure of the encoder and decoder networks as the state propagation happens solely in a latent space.
+
+
+<!-- DATA -->
+<a name="data"></a>
 ## Data
-    
-<b>Hamiltonian Dymamics</b>: Provided for evaluation is a <a href="https://github.com/webdataset/webdataset">WebDataset</a> dataloader and generation scripts for DeepMind's Hamiltonian Dynamics 
-<a href="https://github.com/deepmind/dm_hamiltonian_dynamics_suite">suite</a><sup>[4]</sup>, a simulaton library for 17 different physics datasets that have known underlying Hamiltonian dynamics. 
+
+<b>Hamiltonian Dynamics</b>: Provided for evaluation is a <a href="https://github.com/webdataset/webdataset">WebDataset</a> dataloader and generation scripts for DeepMind's Hamiltonian Dynamics
+<a href="https://github.com/deepmind/dm_hamiltonian_dynamics_suite">suite</a><sup>[4]</sup>, a simulaton library for 17 different physics datasets that have known underlying Hamiltonian dynamics.
 It comes in the form of color image sequences of arbitrary length, coupled with the systems ground truth states (e.g. for pendulum, angular velocity and angle). It is well-benchmarked and customizable, making it a perfect testbed for latent dynamics function evaluation. For each setting, the physical parameters are tweakable alongside an optional friction coefficient to construct non-energy conserving systems. Location of focal points and color of the object are all individually tuneable, enabling mixed and complex visual datasets of varying latent dynamics.
 
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/171246437-0a1ef292-f90c-4fb7-beb3-82a5e74bb549.gif" alt="pendulum examples" /></p>
@@ -132,19 +125,23 @@ For the base presented experiments of this dataset, we consider and evaluate gra
 
 <p> </p>
 <b>Bouncing Balls</b>: Additionally, we provide a dataloader and generation scripts for the standard latent dynamics dataset of bouncing balls<sup>[1,2,5,7,8]</sup>, modified from the implementation in <a href="https://github.com/simonkamronn/kvae/tree/master/kvae/datasets">[1]</a>. It consists of a ball or multiple balls moving within a bounding box while being affected by a number of potential external effects, e.g. gravitational forces<sup>[1,2,5]</sup>, pong<sup>[2]</sup>, interventions<sup>[8]</sup>. The starting positon, angle, and velocity of the ball(s) are sampled uniformly between a set range. It is generated with the <a href="https://github.com/viblo/pymunk">PyMunk</a> and <a href="https://www.pygame.org/news">PyGame</a> libraries. In this repository we consider two sets - a simple set of one gravitational force and a mixed set of 4 gravitational forces in the cardinal directions with varying strengths. We similarly generate `20000` training and `2000` testing trajectories, however sampled at `Δt = 0.1` intervals.
+
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/171948373-ad692ecc-bfac-49dd-86c4-137a2a5e4b73.gif" alt="bouncing ball examples" /></p>
+<p align='center'>Fig N. Single Gravity Boucing Ball Example</p>
+
+
 <p> </p>
-Notably, this dataset is surprisingly difficult to successfully perform long-term generation on, especially in cases of mixed gravities or multiple objects. Most works only report on generation within 5-15 timesteps following a period of 3-5 observation timesteps<sup>[1,2,7]</sup> and farther timesteps show lost trajectories and/or incoherent reconstructions.
-    
+Notably, this system is surprisingly difficult to successfully perform long-term generation on, especially in cases of mixed gravities or multiple objects. Most works only report on generation within 5-15 timesteps following a period of 3-5 observation timesteps<sup>[1,2,7]</sup> and farther timesteps show lost trajectories and/or incoherent reconstructions.
+
 <p> </p>
-<b>Mixing Physics</b>: So far in literature, the majority of works only consider training Neural SSMs on one system of dynamics at a time - with the most variety lying in that of differing trajectory hyper-parameters. The ability to infer multiple dynamical systems under one model (or learn to output dynamical functions given system observations) and leverage similarities between the sets is an ongoing research pursuit - with applications of neural unit hypernetworks<sup>[ICML MetaPrior]</sup> and dynamics functions conditioned on sequences via meta-learning<sup>NeurIPS MetaSSM</sup> being the first dives into this.
-    
+<b>Mixing Physics</b>: So far in literature, the majority of works only consider training Neural SSMs on one system of dynamics at a time - with the most variety lying in that of differing trajectory hyper-parameters. The ability to infer multiple dynamical systems under one model (or learn to output dynamical functions given system observations) and leverage similarities between the sets is an ongoing research pursuit - with applications of neural unit hypernetworks<sup>[ICML MetaPrior]</sup> and dynamics functions conditioned on sequences via meta-learning<sup>[NeurIPS MetaSSM]</sup> being the first dives into this.
+
 <p> </p>
-<b>Other Sets in Literature</b>: Outside of the previous sets, there are a plethora of other datasets that have been explored in relevant work. The popular task of human motion prediction in both the pose estimation and video generation setting have been considered via datasets Human3.6Mil, CMU Mocap, and Weizzman-Action<sup>[5,19]</sup>, though proper experimentation into this area would require problem-specific architectures given the depth of the existing field. Past high-dimensionality and image-space, standard benchmark datasets in time-series forecasting have also been considered, including the <a href="https://github.com/Mcompetitions/M4-methods">M4</a>, <a href="https://github.com/zhouhaoyi/ETDataset">Electricity Transformer Temperature (ETT)</a>, and <a href="https://www.nasa.gov/intelligent-systems-division">the NASA Turbofan Degredation</a> set. Recent works have begun looking at medical applications in inverse image reconstruction and the incorporation of physics-inspired priors<sup>[20]</sup>. Regardless of the success of Neural SSMs on these tasks, the task-agnostic aspect and principled structure of this framework makes it a versatile and appealing option for generative time-series modelling. 
+<b>Other Sets in Literature</b>: Outside of the previous sets, there are a plethora of other datasets that have been explored in relevant work. The popular task of human motion prediction in both the pose estimation and video generation setting have been considered via datasets <a href="http://vision.imar.ro/human3.6m/pami-h36m.pdf">Human3.6Mil</a>, <a href="http://mocap.cs.cmu.edu/">CMU Mocap</a>, and <a href="https://www.wisdom.weizmann.ac.il/~vision/SpaceTimeActions.html">Weizzman-Action</a><sup>[5,19]</sup>, though proper experimentation into this area would require problem-specific architectures given the depth of the existing field. Past high-dimensionality and image-space, standard benchmark datasets in time-series forecasting have also been considered, including the <a href="https://github.com/Mcompetitions/M4-methods">M4</a>, <a href="https://github.com/zhouhaoyi/ETDataset">Electricity Transformer Temperature (ETT)</a>, and <a href="https://www.nasa.gov/intelligent-systems-division">the NASA Turbofan Degredation</a> set. Recent works have begun looking at medical applications in inverse image reconstruction and the incorporation of physics-inspired priors<sup>[20]</sup>. Regardless of the success of Neural SSMs on these tasks, the task-agnostic aspect and principled structure of this framework makes it a versatile and appealing option for generative time-series modelling.
 
 
 <!-- MODELS -->
-<a name="models"/>
-    
+<a name="models"></a>    
 ## Models
 
 <ul>
@@ -152,13 +149,12 @@ Notably, this dataset is surprisingly difficult to successfully perform long-ter
     <li>Latent Dynamics functions (Stochastic/Deterministic, System Identification/State Estimation, Linear/Non-Linear)</li>
     <li>Available models in this repo (RGN, RGN-Res, GRU, LSTM, NODE, etc)</li>
 </ul>
-    
-<!-- METRICS -->
-<a name="metrics"/>
 
+<!-- METRICS -->
+<a name="metrics"></a>
 ## Metrics
 
-<b> Mean Squared Error (MSE)</b>: A common metric used in video and image tasks where its use is in per-frame average over individual pixel error. While a multitude of papers solely use plots of frame MSE over time as an evaluation metric, it is insufficient for comparison between models - especially in cases where the dataset contains a small object for reconstruction<sup>[4]</sup>. This is especially prominent in tasks of system identification where a model that fails to predict long-term may end up with a lower average MSE than a model that has better generation but is slightly off in its object placement. 
+<b> Mean Squared Error (MSE)</b>: A common metric used in video and image tasks where its use is in per-frame average over individual pixel error. While a multitude of papers solely use plots of frame MSE over time as an evaluation metric, it is insufficient for comparison between models - especially in cases where the dataset contains a small object for reconstruction<sup>[4]</sup>. This is especially prominent in tasks of system identification where a model that fails to predict long-term may end up with a lower average MSE than a model that has better generation but is slightly off in its object placement.
 
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/169945139-ebcfc6e9-14d5-4a88-bc38-a9ed41ff5dfc.png" alt="mse equation" /></p>
 <p align='center'>Fig N. Per-Frame MSE Equation.</p>
@@ -173,32 +169,36 @@ Notably, this dataset is surprisingly difficult to successfully perform long-ter
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/169954436-74d02fdc-0ab3-4d2e-b2b4-b595e35144a0.png" alt="dst equation" /></p>
 <p align='center'>Fig N. Per-Frame DST Equation.</p>
 where R<sup>N</sup> is the dimension of the output (e.g. number of image channels) and s, s<sub>hat</sub> are the subsets of "active" predicted pixels.
-    
+
 <p> </p>
 <b>Valid Prediction Distance (VPD)</b>: Similar in spirit to how VPT leverages MSE, VPD is the minimum timestep in which the DST metric surpasses a pre-defined epsilon. This is useful in tracking how long a model can generate an object in a physical system before either incorrect trajectories and/or error accumulation cause significant divergence.
 
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/169961714-2d007dbd-92f2-4ec7-aff0-3c383f21e919.png" alt="vpd equation" /></p>
 <p align='center'>Fig N. Per-Sequence VPD Equation.</p>
-    
+
 <p> </p>
 <b>R<sup>2</sup> Score</b>: For evaluating systems where the full underlying latent system is available and known (e.g. image translations of Hamiltonian systems), the goodness-of-fit score R<sup>2</sup> can be used per dimension to show how well the latent system of the Neural SSM captures the dynamics in an interpretable way<sup>[1,3]</sup>. This is easiest to leverage in linear transition dynamics. While not studied in rigor, it's possible that non-linear dynamics may be more difficult to interpret with R<sup>2</sup> given the potential complexity of capturing fit quality between a high-dimensional non-linear latent state and single-dimensional physical variables. [1], while containing linear transition dynamics, mentioned the possibiltiy of non-linear regression via vanilla neural networks and is a possible direction of evaluation.
 
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/171448933-45983b30-b2fd-4efc-b058-d8f78050ec53.png" alt="dvbf latent interpretability" /></p>
 <p align='center'>Fig N. DVBF Latent Space Visualization for R<sup>2</sup> scores<sup>[1,3]</sup>.</p>
 
-    
-    
-<!-- Miscellaneous -->
-<a name="misc"/>
 
+<!-- EXPERIMENTS -->
+<a name="experiments"></a>
+# Experiments
+
+This section details a number of experiments that evaluate the fundamental aspects of Neural SSMs and the effects of the framework decisions one can take. Trained model checkpoints and hyperparameter files are provided for each experiment under ```experiments/model```. Evaluations are done with the metrics discussed above, as well as visualizations of animated trajectories over time and latent walk visualizations.
+
+<!-- Miscellaneous -->
+<a name="misc"></a>
 # Miscellaneous
 
 This section just consists of to-do's within the repo, contribution guidelines, and a section on how to find the references used throughout the repo.
 
 <!-- TO-DO -->
-<a name="todo"/>
-
+<a name="todo"></a>
 ## To-Do
+
 <h4>Repository-wise</h4>
 
 - Make a ```state_estimation/``` folder in ```models/```
@@ -213,26 +213,22 @@ This section just consists of to-do's within the repo, contribution guidelines, 
 
 <h4>Evaluation-wise</h4>
 
-- Implement R^2 coefficient statistics from latent state to physical variables
 - Implement latent walk visualizations against data-space observations (like in DVBF)
 
 <h4>README-wise</h4>
 
 - Complete ```Introduction``` section with PGM explanations + examples
 - Complete ```Implementation``` section
-    - Data section: datasets, dataloaders, data generators, common datasets
     - Model section: description of abstract class, PyTorch-Lightning training, dynamics class inheritance, etc
 - Add guidelines for an ```Experiment``` section highlighting experiments performed in validating the models
 
 <!-- CONTRIBUTIONS -->
-<a name="contributions"/>
-
+<a name="contributions"></a>
 ## Contributions
 Contributions are welcome and encouraged! If you have an implementation of a latent dynamics function you think would be relevant and add to the conversation, feel free to submit an Issue or PR and we can discuss its incorporation. Similarly, if you feel an area of the README is lacking or contains errors, please put up a README editing PR with your suggested updates. Even tackling items on the To-Do would be massively helpful!
 
 <!-- REFERENCES  -->
-<a name="references"/>
-
+<a name="references"></a>
 ## References
 1. Maximilian Karl, Maximilian Soelch, Justin Bayer, and Patrick van der Smagt. Deep variational bayes filters: Unsupervised learning of state space models from raw data. In International Conference on Learning Representations, 2017.
 2. Marco Fraccaro, Simon Kamronn, Ulrich Paquetz, and OleWinthery. A disentangled recognition and nonlinear dynamics model for unsupervised learning. In Advances in Neural Information Processing Systems, 2017.

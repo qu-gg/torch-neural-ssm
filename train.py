@@ -63,9 +63,9 @@ def parse_args():
     parser = argparse.ArgumentParser()
 
     # Experiment ID
-    parser.add_argument('--exptype', type=str, default='pendulum', help='experiment folder name')
+    parser.add_argument('--exptype', type=str, default='pendulum_3latent', help='experiment folder name')
     parser.add_argument('--checkpt', type=str, default='None', help='checkpoint to resume training from')
-    parser.add_argument('--model', type=str, default='lstm', help='which model to use for training')
+    parser.add_argument('--model', type=str, default='node', help='which model to use for training')
 
     # Dataset-to-use parameters
     parser.add_argument('--dataset', type=str, default='pendulum', help='dataset name for training')
@@ -86,7 +86,7 @@ def parse_args():
     parser.add_argument('--dim', type=int, default=32, help='dimension of the image data')
 
     # Latent network dimensions
-    parser.add_argument('--latent_dim', type=int, default=16, help='latent dimension size')
+    parser.add_argument('--latent_dim', type=int, default=3, help='latent dimension size')
     parser.add_argument('--num_layers', type=int, default=4, help='number of layers in the dynamics func')
     parser.add_argument('--num_hidden', type=int, default=250, help='number of nodes per layer in dynamics func')
     parser.add_argument('--latent_act', type=str, default="leaky_relu", help='type of act func in dynamics func')
