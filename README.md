@@ -8,6 +8,7 @@ This repository is meant to conceptually introduce and highlight implementation 
 
 Included is an abstract PyTorch-Lightning training class structure with specific latent dynamic functions that inherit it, as well as common metrics used in their evaluation and training examples on common datasets. Further broken down via implementation is the distinction between <i>system identification</i> and <i>state estimation</i> approaches, which are reminiscent of their classic SSM counterparts and arise from fundamental differences in the underlying choice of probabilistic graphical model (PGM).
 
+<a name="pgmSchematic"></a>
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/169753112-bc849b24-fe13-4975-8697-fea95bb19fb5.png" alt="pgm schematic" /></p>
 <p align='center'>Fig 1. Schematic of the two PGM forms of Neural SSMs.</p>
 
@@ -35,6 +36,7 @@ If you found the information helpful for your work or use portions of this repo 
 - [Background](#background)
   - [What are Neural SSMs?](#neuralSSMwhat)
   - [Choice of SSM PGM](#pgmChoice)
+  - [Latent Initial State Z<sub>0</sub> / Z<sub>init</sub>](#initialState)
   - [System Controls, u<sub>t</sub>](#ssmControls)
 - [Implementation](#implementation)
   - [Data](#data)
@@ -55,19 +57,60 @@ This section gives an introduction to the concept of Neural SSMs, some common co
 <a name="neuralSSMwhat"></a>
 ## What are Neural SSMs?
 An extension of classical state-space models, they - at their core - consist of a dynamic function of some latent states <b>z_k</b> and their emission to observations <b>x_k</b>, realized through the equations:
-<p align='center'><img src="https://user-images.githubusercontent.com/32918812/169743189-057f52a5-8a08-4616-9516-3c60aca86b28.png" alt="neural ssm equations" /></p>
-where <b>θ_z</b> represents the parameters of the latent dynamic function. The precise form of these functions can vary significantly - from deterministic or stochastic, linear or non-linear, and discrete or continuous.
+<a name="ssmEQ"></a>
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/169743189-057f52a5-8a08-4616-9516-3c60aca86b28.png" alt="neural ssm equations" )/></p>
+where <b>θ</b><sub>z</sub> represents the parameters of the latent dynamic function. The precise form of these functions can vary significantly - from deterministic or stochastic, linear or non-linear, and discrete or continuous.
 <p> </p>
 Due to their explicit differentiation of transition and emission and leveraging of structured equations, they have found success in learning interpretable latent dynamic spaces<sup>[1,2,3]</sup>, identifying physical systems from non-direct features<sup>[4,5,6]</sup> and uses in counterfactual forecasting<sup>[7,8,14]</sup>.
 <p> </p>
 Given the fast pace of progress in latent dynamics modelling over recent years, many models have been presented under a variety of terminologies and proposed frameworks - examples being variational latent recurrent models<sup>[5,9,10,11,12]</sup>, deep state space models<sup>[1,2,3,7,13,14]</sup>, and deterministic encoding-decoding models<sup>[4,15,16]</sup>. Despite differences in appearance, they all adhere to the same conceptual framework of latent variable modelling and state-space disentanglement. As such, here we unify them under the term of Neural SSMs and segment them into the two base choices of probabilistic graphical models that they adhere to: <i>system identification</i> and <i>state estimation</i>. We highlight each PGM's properties and limitations with experimental evaluations on benchmark datasets.
+
 
 <!-- PGM CHOICES -->
 <a name="pgmChoice"></a>
 ## Choice of PGM - System Identification vs State Estimation
 The PGM associated with each approach is determined by the latent variable chosen for inference.
 
-<b>System states as latent variables</b>: The intuitive choice for the latent variable is the latent state <b>z_k</b> that underlies <b>x_k</b>, given that it is already latent in the system and is directly associated with the observations. The PGM of this form is shown under Fig. 1A
+<a name="latentSchematic"></a>
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/172081773-d6af11d9-9c1e-4b04-8c65-a83e0fa80dbc.png" alt="latent variable schematic" /></p>
+<p align='center'>Fig 2. Schematic of latent variable PGMs in Neural SSMS.</p>
+
+
+<b>System states as latent variables (State Estimation)</b>: The intuitive choice for the latent variable is the latent state <b>z_k</b> that underlies <b>x_k</b>, given that it is already latent in the system and is directly associated with the observations. The PGM of this form is shown under Fig. [1A](#pgmSchematic) where its marginal likelihood over an observed sequence x<sub>0:T</sub> is written as:
+
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/172077627-bc72445e-11d9-4344-86fc-0abbd0c723df.png" alt="state likelihood" /></p>
+
+where <i>p</i>(<b>x</b><sub>i</sub> | <b>z</b><sub>i</sub>) describes the emission model and <i>p</i>(<b>z</b><sub>i</sub> | <b>z</b><sub><i</sub>, <b>x</b><sub><u><</u>i</sub>) describes the latent dynamics function. Given the common intractibility of the posterior, parameter inference is performed through a variational approximation of the posterior density <i>q</i>(<b>z</b><sub>0:T</sub> | <b>x</b><sub>0:T</sub>), expressed as:
+
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/172077640-16e26f56-bed3-4dec-b078-783e247eeda3.png" alt="state variational posterior" /></p>
+
+Given these two components, the standard training objective of the Evidence Lower Bound Objective (ELBO) is thus derived with the form:
+
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/172077692-452892fc-e5e6-4f4a-9296-e975130da816.png" alt="state ELBO" /></p>
+
+where the first term represents a reconstruction likelihood term over the sequence and the second is a Kullback-Leibler divergence loss between the variational posterior approximation and some assumed prior of the latent dynamics. This prior can come in many forms, either being the standard Gaussian Normal in variational inference, flow-based priors from ODE settings<sup>[5]</sup>, or physics-based priors in problem-specific situations<sup>[20]</sup>. This is the primary design choice that separates current works in this area, specifically the modelling of the dynamics prior and its learned approximation. Many works draw inspiration for modelling this interaction by filtering techniques in standard SSMs, where a divergence term is constructed between the dynamics-predicted latent state and the data-corrected observation<sup>[7,18]</sup>.
+
+With this formulation, it is easy to see how dynamics models of this type can have strong reconstructive capacity for the high-dimensional outputs and contain strong short-term predictions. In addition, input-influenced dynamics is inherent to the prediction task, as errors in the latent dynamics predictions are corrected by true observations every step. However, given this data-based correction, the resulting inference of <i>q</i>(<b>z</b><sub>i</sub> | <b>z</b><sub><i</sub>, <b>x</b><sub><u><</u>i</sub>) is weakened and without near-term observations to guide the dynamics function, its long-horizon forecasting is limited<sup>[1,3]</sup>.
+
+<b>System parameters as latent variables (System Identification)</b>: Rather than system states, one can instead choose to select the parameters (denoted as <b>θ</b><sub>z</sub> in Equation [1](#ssmEQ)). With this change, the resulting PGM is represented from Fig. [1B](#pgmSchematic) and its marginal likelihood over x<sub>0:T</sub> is represented now by:
+
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/172077614-52b7ff61-24f6-4828-8714-a73b57628e41.png" alt="sysID likelihood" /></p>
+
+where the resulting output observations are derived from an initial latent state <b>z</b><sub>0</sub> and the dynamics parameters <b>θ</b><sub>z</sub>. As before, a variational approximation is considered for inference in place of an intractable posterior but now for the density <i>q</i>(<b>θ</b><sub>z</sub>, <b>z</b><sub>0</sub>) instead. Given prior density assumptions of  <i>p</i>(<b>θ</b><sub>z</sub>) and <i>p</i>(<b>z</b><sub>0</sub>) in a similar vein as above, the ELBO function for this PGM is constructed as:
+
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/172078432-50f30273-508a-4286-98a4-bdd3fa03bc03.png" alt="sysID ELBO" /></p>
+where again the first term is a reconstruction likelihood and the terms following represent KL-Divergence losses over the inferred variables.
+
+<p> </p>
+The given formulation here is the most general form for this line of models and other works can be covered under special assumptions or restrictions of how <i>q</i>(<b>θ</b><sub>z</sub>) and <i>p</i>(<b>θ</b><sub>z</sub>) are modelled. Original Neural SSM parameter works consider Linear-Gaussian SSMs as the transition function and introduce non-linearity by varying the transition parameters over time as <b>θ</b><sub>z<sub>0:T</sub></sub><sup>[1,2,3]</sup>. However, as shown in Fig. [2B<sub>1</sub>](#latentSchematic), the result of this results in convoluted temporal modelling and devolves into the same state estimation problem as now the time-varying parameters rely on near-term observations for correctness<sup>[8,20]</sup>. Rather than time-varying, the system parameters could be considered an optimized global variable, in which the underlying dynamics function becomes a Bayesian neural network in a VAE's latent space<sup>[5]</sup>. Restricting these parameters to be deterministic results in a model of the form presented in Latent ODE<sup>[10]</sup>. The furthest restriction in forgoing stochasticity in the inference of <b>z</b><sub>0</sub> results in the suite of models as presented in [4]. 
+
+<p> </p>
+Regardless of the precise assumptions, this framework builds a strong latent dynamics function that enables long-term forecasting and, in some settings, even full-scale system identification<sup>[1,4]</sup> of physical systems. This is done at the cost of a harder inference task given no access to dynamics correction during generation and for full identification tasks, often requires a large number of training samples over the potential system state space<sup>[4,5]</sup>.
+
+<!-- INITIAL STATE -->
+<a name="initialState"></a>
+## Latent Initial State Z<sub>0</sub> / Z<sub>init</sub>
+Placeholder text regarding encoders and stacked frames etc etc.
 
 <!-- CONTROLS -->
 <a name="ssmControls"></a>
