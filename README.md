@@ -73,7 +73,7 @@ The PGM associated with each approach is determined by the latent variable chose
 
 <a name="latentSchematic"></a>
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/172081773-d6af11d9-9c1e-4b04-8c65-a83e0fa80dbc.png" alt="latent variable schematic" /></p>
-<p align='center'>Fig 2. Schematic of latent variable PGMs in Neural SSMS.</p>
+<p align='center'>Fig 2. Schematic of latent variable PGMs in Neural SSMS<sup>[MetaLearning]</sup>.</p>
 
 
 <b>System states as latent variables (State Estimation)</b>: The intuitive choice for the latent variable is the latent state <b>z_k</b> that underlies <b>x_k</b>, given that it is already latent in the system and is directly associated with the observations. The PGM of this form is shown under Fig. [1A](#pgmSchematic) where its marginal likelihood over an observed sequence x<sub>0:T</sub> is written as:
@@ -102,7 +102,7 @@ where the resulting output observations are derived from an initial latent state
 where again the first term is a reconstruction likelihood and the terms following represent KL-Divergence losses over the inferred variables.
 
 <p> </p>
-The given formulation here is the most general form for this line of models and other works can be covered under special assumptions or restrictions of how <i>q</i>(<b>θ</b><sub>z</sub>) and <i>p</i>(<b>θ</b><sub>z</sub>) are modelled. Original Neural SSM parameter works consider Linear-Gaussian SSMs as the transition function and introduce non-linearity by varying the transition parameters over time as <b>θ</b><sub>z<sub>0:T</sub></sub><sup>[1,2,3]</sup>. However, as shown in Fig. [2B<sub>1</sub>](#latentSchematic), the result of this results in convoluted temporal modelling and devolves into the same state estimation problem as now the time-varying parameters rely on near-term observations for correctness<sup>[8,20]</sup>. Rather than time-varying, the system parameters could be considered an optimized global variable, in which the underlying dynamics function becomes a Bayesian neural network in a VAE's latent space<sup>[5]</sup>. Restricting these parameters to be deterministic results in a model of the form presented in Latent ODE<sup>[10]</sup>. The furthest restriction in forgoing stochasticity in the inference of <b>z</b><sub>0</sub> results in the suite of models as presented in [4]. 
+The given formulation here is the most general form for this line of models and other works can be covered under special assumptions or restrictions of how <i>q</i>(<b>θ</b><sub>z</sub>) and <i>p</i>(<b>θ</b><sub>z</sub>) are modelled. Original Neural SSM parameter works consider Linear-Gaussian SSMs as the transition function and introduce non-linearity by varying the transition parameters over time as <b>θ</b><sub>z<sub>0:T</sub></sub><sup>[1,2,3]</sup>. However, as shown in Fig. [2B<sub>1</sub>](#latentSchematic), the result of this results in convoluted temporal modelling and devolves into the same state estimation problem as now the time-varying parameters rely on near-term observations for correctness<sup>[8,20]</sup>. Rather than time-varying, the system parameters could be considered an optimized global variable, in which the underlying dynamics function becomes a Bayesian neural network in a VAE's latent space<sup>[5]</sup> and is shown in Fig. [2B<sub>2</sub>](#latentSchematic). Restricting these parameters to be deterministic results in a model of the form presented in Latent ODE<sup>[10]</sup>. The furthest restriction in forgoing stochasticity in the inference of <b>z</b><sub>0</sub> results in the suite of models as presented in [4]. 
 
 <p> </p>
 Regardless of the precise assumptions, this framework builds a strong latent dynamics function that enables long-term forecasting and, in some settings, even full-scale system identification<sup>[1,4]</sup> of physical systems. This is done at the cost of a harder inference task given no access to dynamics correction during generation and for full identification tasks, often requires a large number of training samples over the potential system state space<sup>[4,5]</sup>.
@@ -150,8 +150,43 @@ For Neural SSMs, a variety of approaches have been taken thus far dependent on t
 <a name="implementation"></a>
 # Implementation
 
-In this section, details on model implementation and the datasets/metrics used are detailed. Specific data generation details are available in the URLs provided for each dataset. The models and datasets used throughout this repo are solely grayscale physics datasets with underlying Hamiltonian laws, such as pendulum and mass spring sets. Extensions to color images and non-pixel based tasks (or even graph-based data!) is easily done in this framework, as the only architecture change need is the structure of the encoder and decoder networks as the state propagation happens solely in a latent space.
+In this section, specifics on model implementation and the datasets/metrics used are detailed. Specific data generation details are available in the URLs provided for each dataset. The models and datasets used throughout this repo are solely grayscale physics datasets with underlying Hamiltonian laws, such as pendulum and mass spring sets. Extensions to color images and non-pixel based tasks (or even graph-based data!) is easily done in this framework, as the only architecture change need is the structure of the encoder and decoder networks as the state propagation happens solely in a latent space.
 
+The project's folder structure is as follows:
+<a name="folderStructure"></a>
+```
+  torchssm/
+  │
+  ├── train.py                      # Training entrypoint that takes in user args and handles boilerplate
+  ├── README.md                     # What you're reading right now :^)
+  ├── requirements.txt              # Anaconda requirements file to enable easily setup
+  |
+  ├── data/
+  |   ├── <dataset_type>            # Name of the stored dynamics dataset (e.g. pendulum)
+  |   ├── generate_bouncingball.py  # Dataset generation script for Bouncing Ball
+  |   ├── generate_hamiltonian.py   # Dataset generation script for Hamiltonian Dynamics
+  |   └── tar_directory.py          # WebDataset generation script 
+  ├── experiments/
+  |   └── <model_name>              # Name of the dynamics model run
+  |       └── <experiment_type>     # Given name for the ran experiment
+  |           └── <version_x>/      # Each experiment type has its sequential lightning logs saved
+  ├── lightning_logs/
+  |   ├── version_0/                # Placeholder lightning log folder
+  |   └── ...                       # Subsequent runs
+  ├── models/
+  │   ├── CommonDynamics.py         # Abstract PyTorch-Lightning Module to handle train/test loops
+  │   ├── CommonVAE.py              # Shared encoder/decoder Modules for the VAE portion
+  │   ├── system_identification/ 
+  │       └── ...                   # Specific System-Identification dynamics functions
+  │   └── state_estimation/
+  │       └── ...                   # Specific State-Estimation dynamics functions
+  ├── utils/
+  │   ├── layers.py                 # PyTorch Modules that represent general network layers
+  │   ├── metrics.py                # Metric functions for evaluation
+  │   ├── plotting.py               # Plotting functions for visualizatin
+  |   └── utils.py                  # General utility functions (e.g. argparsing, experiment number tracking, etc)
+  └──
+```
 
 <!-- DATA -->
 <a name="data"></a>
@@ -193,6 +228,26 @@ Notably, this system is surprisingly difficult to successfully perform long-term
     <li>Available models in this repo (RGN, RGN-Res, GRU, LSTM, NODE, etc)</li>
 </ul>
 
+### Implementation Structure
+Provided within this repository is a PyTorch class structure in which an abstract PyTorch-Lightning Module is shared across all the given models, from which the specific VAE and dynamics functions inherit and override the relevant forward functions for training and evaluation. Swapping between dynamics functions and PGM type is as easy as passing in the model's name for arguments, e.g. `python3 train.py --model node`. As the implementation is provided in <a href="https://pytorch-lightning.readthedocs.io/en/latest/">PyTorch-Lightning</a>, an optimization and boilerplate library for PyTorch, it is recommended to be familiar at face-level.
+
+<p> </p>
+For every model run, a new lightning_logs/ version folder is created as well as a new experiment version under `experiments` related to the passed in naming arguments. Hyperparameters passed in for this run are both stored in the Tensorboard instance created as well as in the local file `hparams.yaml`. Default values and available options can be found in `utils/utils.py` or by running `python3 train.py -h`. During training and validation sequences, all of the metrics below are automatically tracked and saved into a Tensorboard instance which can be used to compare different model runs following. Every 5 epochs, reconstruction sequences against the ground truth for a set of samples are saved to the experiments folder. Currently only one checkpoint is saved based on the last epoch ran rather than checkpoints based on best validation score or over a set epochs. Restarting training from a checkpoint or loading in a model for testing is done currently by the `lightning_logs/` ID, e.g. `python3 train.py --ckpt 51`.
+
+<p> </p>
+The implemented dynamics functions are each separated into their respective PGM groups, however they can still share the same general classes. Each dynamics subclass has its own `model_specific_loss` function that allows it to return additional loss values without interrupting the abstract flow. For example, this could be used in a flow-based prior that has additional KL terms over ODE flow density without needing to override the `training_step` function with a duplicate copy.
+
+### Implemented Dymamics
+
+<b>System Identification Models</b>: 
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/172108058-481009a0-41c9-449e-bc0f-7b7a45ecefe0.png", height=400, alt="sysID models" /></p>
+<p align='center'>Fig N. Complete model schematic for system identifcation and the implemented dynamics functions.</p>
+ 
+<b>State Estimation Models</b>: 
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/172108940-b98e5b66-c528-47f6-b6c4-8a0fc955b090.png", height=400, alt="stateEst models" /></p>
+<p align='center'>Fig N. Complete model schematic for state estimation and the implemented dynamics functions.</p>
+
+
 <!-- METRICS -->
 <a name="metrics"></a>
 ## Metrics
@@ -220,7 +275,7 @@ where R<sup>N</sup> is the dimension of the output (e.g. number of image channel
 <p align='center'>Fig N. Per-Sequence VPD Equation.</p>
 
 <p> </p>
-<b>R<sup>2</sup> Score</b>: For evaluating systems where the full underlying latent system is available and known (e.g. image translations of Hamiltonian systems), the goodness-of-fit score R<sup>2</sup> can be used per dimension to show how well the latent system of the Neural SSM captures the dynamics in an interpretable way<sup>[1,3]</sup>. This is easiest to leverage in linear transition dynamics. While not studied in rigor, it's possible that non-linear dynamics may be more difficult to interpret with R<sup>2</sup> given the potential complexity of capturing fit quality between a high-dimensional non-linear latent state and single-dimensional physical variables. [1], while containing linear transition dynamics, mentioned the possibiltiy of non-linear regression via vanilla neural networks and is a possible direction of evaluation.
+<b>R<sup>2</sup> Score</b>: For evaluating systems where the full underlying latent system is available and known (e.g. image translations of Hamiltonian systems), the goodness-of-fit score R<sup>2</sup> can be used per dimension to show how well the latent system of the Neural SSM captures the dynamics in an interpretable way<sup>[1,3]</sup>. This is easiest to leverage in linear transition dynamics. While not studied in rigor, it's possible that non-linear dynamics may be more difficult to interpret with R<sup>2</sup> given the potential complexity of capturing fit quality between a high-dimensional non-linear latent state and single-dimensional physical variables. Ref. [1], while containing linear transition dynamics, mentioned the possibiltiy of non-linear regression via vanilla neural networks and is a possible direction of evaluation.
 
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/171448933-45983b30-b2fd-4efc-b058-d8f78050ec53.png" alt="dvbf latent interpretability" /></p>
 <p align='center'>Fig N. DVBF Latent Space Visualization for R<sup>2</sup> scores<sup>[1,3]</sup>.</p>
@@ -246,6 +301,7 @@ This section just consists of to-do's within the repo, contribution guidelines, 
 
 - Make a ```state_estimation/``` folder in ```models/```
 - Make a ```system_identification``` folder in ```models``` and shift current models to it
+- Make a ```requirements.txt``` file for an Anaconda environment
 
 <h4>Model-wise</h4>
 
