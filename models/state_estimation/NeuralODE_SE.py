@@ -1,7 +1,7 @@
 """
-@file NeuralODE.py
+@file NeuralODE_SE.py
 
-Holds the model for the Neural ODE latent dynamics function
+Holds the state estimation model for the Neural ODE latent dynamics function
 """
 import torch
 import torch.nn as nn
@@ -9,6 +9,7 @@ from torchdiffeq import odeint
 
 from utils.utils import get_act
 from models.CommonDynamics import LatentDynamicsModel
+from models.CommonVAE import LatentStateEncoder
 
 
 class ODEFunction(nn.Module):
@@ -35,7 +36,7 @@ class ODEFunction(nn.Module):
         return x
 
 
-class NeuralODE(LatentDynamicsModel):
+class NeuralODE_SE(LatentDynamicsModel):
     def __init__(self, args, top, exptop, last_train_idx):
         """ Latent dynamics as parameterized by a global deterministic neural ODE """
         super().__init__(args, top, exptop, last_train_idx)
@@ -43,7 +44,13 @@ class NeuralODE(LatentDynamicsModel):
         # ODE-Net which holds mixture logic
         self.ode_func = ODEFunction(args)
 
-    def forward(self, x):
+        # Observation encoder
+        self.obs_encoder = LatentStateEncoder(1, args.num_filt, 1, args.latent_dim, args.fix_variance)
+
+        # Correction cell
+        self.correction = nn.GRUCell(input_size=args.latent_dim, hidden_size=args.latent_dim)
+
+    def forward(self, x, **kwargs):
         """
         Forward function of the network that handles locally embedding the given sample into the C codes,
         generating the z posterior that defines mixture weightings, and finding the winning components for
@@ -57,13 +64,23 @@ class NeuralODE(LatentDynamicsModel):
         z_init = self.encoder(x)
 
         # Evaluate model forward over T to get L latent reconstructions
-        t = torch.linspace(0, generation_len, generation_len + 1).to(self.device)
+        t = torch.linspace(0, generation_len - 1, generation_len).to(self.device)
 
-        # Evaluate forward over timestep
-        zt = odeint(self.ode_func, z_init, t, method='rk4', options={'step_size': 0.5})  # [T,q]
-        zt = zt.permute([1, 0, 2])[:, 1:]
+        zt = []
+        prev_z = z_init
+        for tidx in t:
+            # Propagate forward one timestep with ODE
+            z_pred = odeint(self.ode_func, prev_z, torch.Tensor([0, 1]), method='rk4', options={'step_size': 0.5})[1]
+
+            # Encode observation at step
+            z_obs = self.obs_encoder(x[:, int(tidx) - 1].unsqueeze(1))
+
+            # Correction prediction with encoding
+            prev_z = self.correction(z_pred, z_obs)
+            zt.append(prev_z)
 
         # Stack zt and decode zts
+        zt = torch.stack(zt)
         x_rec = self.decoder(zt.contiguous().view([zt.shape[0] * zt.shape[1], -1]))
         return x_rec, zt
 
@@ -71,5 +88,5 @@ class NeuralODE(LatentDynamicsModel):
     def add_model_specific_args(parent_parser):
         """ Placeholder function for model-specific arguments """
         parser = parent_parser.add_argument_group("NODE")
-        parser.add_argument('--model_file', type=str, default="NeuralODE", help='filename of the model')
+        parser.add_argument('--model_file', type=str, default="state_estimation/NeuralODE_SE", help='filename of the model')
         return parent_parser

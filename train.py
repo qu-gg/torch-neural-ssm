@@ -5,57 +5,10 @@ Holds the general training script for the models, defining a dataset and model t
 """
 import os
 import argparse
-import webdataset as wds
 import pytorch_lightning
 
+from utils.dataloader import Dataset
 from utils.utils import get_exp_versions, get_model
-
-
-class Dataset(pytorch_lightning.LightningDataModule):
-    def __init__(self, args, batch_size=32, workers=0):
-        super(Dataset, self).__init__()
-        shard_size = (args.dataset_size // 50) - 1
-
-        bucket = "data/{}/{}/train_tars/".format(args.dataset, args.dataset_ver)
-        shards = "{000.." + str(shard_size) + "}.tar"
-        self.training_urls = os.path.join(bucket, shards)
-        print(self.training_urls)
-
-        bucket = "data/{}/{}/test_tars/".format(args.dataset, args.dataset_ver)
-        shards = "{000.." + str(shard_size) + "}.tar"
-        self.validation_urls = os.path.join(bucket, shards)
-
-        self.length = args.dataset_size // batch_size
-        self.batch_size = batch_size
-        self.num_workers = workers
-
-    def make_loader(self, urls, mode="train"):
-        shuffle = 1000 if mode == "train" else 0
-
-        dataset = (
-            wds.WebDataset(urls, shardshuffle=True)
-            .shuffle(shuffle)
-            .decode("rgb")
-            .to_tuple("npz")
-            .batched(self.batch_size, partial=False)
-        )
-
-        loader = wds.WebLoader(
-            dataset,
-            batch_size=None,
-            shuffle=False,
-            num_workers=self.num_workers
-        )
-
-        loader.length = self.length
-        loader.unbatched().shuffle(1000).batched(self.batch_size)
-        return loader
-
-    def train_dataloader(self):
-        return self.make_loader(self.training_urls, "train")
-
-    def val_dataloader(self):
-        return self.make_loader(self.validation_urls, "val")
 
 
 def parse_args():
@@ -65,7 +18,7 @@ def parse_args():
     # Experiment ID
     parser.add_argument('--exptype', type=str, default='pendulum_3latent', help='experiment folder name')
     parser.add_argument('--checkpt', type=str, default='None', help='checkpoint to resume training from')
-    parser.add_argument('--model', type=str, default='node', help='which model to use for training')
+    parser.add_argument('--model', type=str, default='node_se', help='which model to use for training')
 
     # Dataset-to-use parameters
     parser.add_argument('--dataset', type=str, default='pendulum', help='dataset name for training')
@@ -86,7 +39,7 @@ def parse_args():
     parser.add_argument('--dim', type=int, default=32, help='dimension of the image data')
 
     # Latent network dimensions
-    parser.add_argument('--latent_dim', type=int, default=3, help='latent dimension size')
+    parser.add_argument('--latent_dim', type=int, default=16, help='latent dimension size')
     parser.add_argument('--num_layers', type=int, default=4, help='number of layers in the dynamics func')
     parser.add_argument('--num_hidden', type=int, default=250, help='number of nodes per layer in dynamics func')
     parser.add_argument('--latent_act', type=str, default="leaky_relu", help='type of act func in dynamics func')

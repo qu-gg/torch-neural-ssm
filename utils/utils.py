@@ -9,14 +9,21 @@ import torch.nn as nn
 
 def get_model(name):
     """ Import and return the specific latent dynamics function by the given name"""
-    if name == "node":
-        from models.NeuralODE import NeuralODE
-        return NeuralODE
-    elif name == "lstm":
-        from models.LSTM import LSTM
-        return LSTM
+    # TODO - Reorganize into two groups for clarity
+    if name == "node_si":
+        from models.system_identification.NeuralODE_SI import NeuralODE_SI
+        return NeuralODE_SI
+    if name == "node_se":
+        from models.state_estimation.NeuralODE_SE import NeuralODE_SE
+        return NeuralODE_SE
+    elif name == "lstm_se":
+        from models.state_estimation.LSTM_SE import LSTM_SE
+        return LSTM_SE
+    elif name == "lstm_si":
+        from models.system_identification.LSTM_SI import LSTM_SI
+        return LSTM_SI
     elif name == "rgn":
-        from models.RGN import RGN
+        from models.system_identification.RGN import RGN
         return RGN
     else:
         raise NotImplementedError("Model type {} not implemented.".format(name))

@@ -1,7 +1,7 @@
 """
-@file LSTM.py
+@file LSTM_SI.py
 
-Holds the model for the LSTM latent dynamics function
+Holds the system identification model for the LSTM latent dynamics function
 """
 import torch
 import torch.nn as nn
@@ -10,7 +10,7 @@ from utils.utils import get_act
 from models.CommonDynamics import LatentDynamicsModel
 
 
-class LSTM(LatentDynamicsModel):
+class LSTM_SI(LatentDynamicsModel):
     def __init__(self, args, top, exptop, last_train_idx):
         """ Latent dynamics as parameterized by a global deterministic LSTM """
         super().__init__(args, top, exptop, last_train_idx)
@@ -40,9 +40,9 @@ class LSTM(LatentDynamicsModel):
         zt = []
         for tidx in t:
             if tidx == 1:
-                z_hid, c_hid = self.dynamics_func(z_init)
+                z_hid, _ = self.dynamics_func(z_init)
             else:
-                z_hid, c_hid = self.dynamics_func(z, (z_hid, c_hid))
+                z_hid, _ = self.dynamics_func(z)
 
             z_hid = self.latent_act(z_hid)
             z = self.dynamics_out(z_hid)
@@ -57,5 +57,5 @@ class LSTM(LatentDynamicsModel):
     def add_model_specific_args(parent_parser):
         """ Placeholder function for model-specific arguments """
         parser = parent_parser.add_argument_group("LSTM")
-        parser.add_argument('--model_file', type=str, default="LSTM", help='filename of the model')
+        parser.add_argument('--model_file', type=str, default="system_identification/LSTM", help='filename of the model')
         return parent_parser

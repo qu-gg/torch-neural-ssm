@@ -119,16 +119,20 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         Upon epoch end, save the training file and show reconstructions every 10 epochs
         :param outputs: list of outputs from the training steps, with the last 25 steps having reconstructions
         """
+        # Make lightning logs folder if it does not exist
+        version_path = os.path.abspath('') + "/lightning_logs/version_{}/".format(self.top)
+
         # Make image dir in lightning experiment folder if it doesn't exist
-        if not os.path.exists('lightning_logs/version_{}/images/'.format(self.top)):
-            os.mkdir('lightning_logs/version_{}/images/'.format(self.top))
-            shutil.copy("models/{}.py".format(self.args.model_file), "lightning_logs/version_{}/".format(self.top))
+        if not os.path.exists(version_path + '/images/'):
+            os.mkdir(version_path + '/images/')
+            # TODO - fix this copy in RayTune scripting
+            # shutil.copy("models/{}.py".format(self.args.model_file), "lightning_logs/version_{}/".format(self.top))
 
         """ Every N epochs, get reconstructions on batch of data """
         if self.current_epoch % 4 == 0:
             # Show side-by-side reconstructions
             show_images(outputs[-1]["images"], outputs[-1]["preds"],
-                        'lightning_logs/version_{}/images/recon{}train.png'.format(self.top, self.current_epoch),
+                        version_path + '/images/recon{}train.png'.format(self.current_epoch),
                         num_out=5)
 
             # Get R^2 over training set
@@ -151,11 +155,12 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
                 self.log("train_r2_{}".format(idx), r, prog_bar=True)
 
             # Copy experiment to relevant folder
-            if self.args.exptype is not None:
-                if os.path.exists("experiments/{}/{}/version_{}".format(self.args.model, self.args.exptype, self.exptop)):
-                    shutil.rmtree("experiments/{}/{}/version_{}".format(self.args.model, self.args.exptype, self.exptop))
-                shutil.copytree("lightning_logs/version_{}/".format(self.top),
-                                "experiments/{}/{}/version_{}".format(self.args.model, self.args.exptype, self.exptop))
+            # TODO - fix this copy in RayTune scripting
+            # if self.args.exptype is not None:
+            #     if os.path.exists("experiments/{}/{}/version_{}".format(self.args.model, self.args.exptype, self.exptop)):
+            #         shutil.rmtree("experiments/{}/{}/version_{}".format(self.args.model, self.args.exptype, self.exptop))
+            #     shutil.copytree("lightning_logs/version_{}/".format(self.top),
+            #                     "experiments/{}/{}/version_{}".format(self.args.model, self.args.exptype, self.exptop))
 
     def validation_step(self, batch, batch_idx):
         """
@@ -178,7 +183,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
 
         # Reconstruction loss
         likelihood = self.reconstruction_loss(preds, images).sum([2, 3]).view([-1]).mean()
-        self.log("val_likelihood", likelihood, prog_bar=True, on_epoch=True, on_step=False)
+        self.log("val_likelihood", likelihood, prog_bar=True)
 
         # Get the loss terms from the specific latent dynamics loss
         dynamics_loss = self.model_specific_loss()
@@ -203,16 +208,20 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         Upon epoch end, save the training file and show reconstructions every 5 epochs
         :param outputs: list of outputs from the validation steps at batch 0
         """
+        # Make lightning logs folder if it does not exist
+        version_path = os.path.abspath('') + "/lightning_logs/version_{}/".format(self.top)
+
         # Make image dir in lightning experiment folder if it doesn't exist
-        if not os.path.exists('lightning_logs/version_{}/images/'.format(self.top)):
-            os.mkdir('lightning_logs/version_{}/images/'.format(self.top))
-            shutil.copy("models/{}.py".format(self.args.model_file), "lightning_logs/version_{}/".format(self.top))
+        if not os.path.exists(version_path + '/images/'):
+            os.mkdir(version_path + '/images/')
+            # TODO - fix this copy in RayTune scripting
+            # shutil.copy("models/{}.py".format(self.args.model_file), version_path)
 
         """ Every 10 epochs, get reconstructions on batch of data """
         if self.current_epoch % 5 == 0 and self.current_epoch != 0:
             # Show side-by-side reconstructions
             show_images(outputs[0]["images"], outputs[0]["preds"],
-                        'lightning_logs/version_{}/images/recon{}val.png'.format(self.top, self.current_epoch),
+                        version_path + '/images/recon{}val.png'.format(self.current_epoch),
                         num_out=5)
 
             # Get R^2 over validation set
@@ -232,7 +241,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
 
             # Log each dimension's R2 individually
             for idx, r in enumerate(r2s):
-                self.log("val_r2_{}".format(idx), r, prog_bar=True, on_epoch=True, on_step=False)
+                self.log("val_r2_{}".format(idx), r, prog_bar=True)
 
     def test_step(self, batch, batch_idx):
         """
