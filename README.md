@@ -51,7 +51,7 @@ If you found the information helpful for your work or use portions of this repo 
 <a name="background"></a>
 # Background
 
-This section gives an introduction to the concept of Neural SSMs, some common considerations and limitations, and active areas of research. This section assumes some familiarity with state-space models, though not much is required to gain a conceptual understanding if one is already coming from a latent modelling perspective or Bayesian learning. Resources are a plenty out there considering the width and depth of state-space usage, however this <a href="https://www.youtube.com/watch?v=hpeKrMG-WP0">resource</a> is a good starting point.
+This section gives an introduction to the concept of Neural SSMs, some common considerations and limitations, and active areas of research. This section assumes some familiarity with state-space models, though not much is required to gain a conceptual understanding if one is already coming from a latent modelling perspective or Bayesian learning. Resources are a plenty out there considering the width and depth of state-space usage, however this <a href="https://www.youtube.com/watch?v=hpeKrMG-WP0">video</a> and <a href="https://github.com/probml/ssm-book">modern textbook</a> are good starting points.
 
 <!-- Neural SSM INTRO -->
 <a name="neuralSSMwhat"></a>
@@ -63,7 +63,7 @@ where <b>θ</b><sub>z</sub> represents the parameters of the latent dynamic func
 <p> </p>
 Due to their explicit differentiation of transition and emission and leveraging of structured equations, they have found success in learning interpretable latent dynamic spaces<sup>[1,2,3]</sup>, identifying physical systems from non-direct features<sup>[4,5,6]</sup> and uses in counterfactual forecasting<sup>[7,8,14]</sup>.
 <p> </p>
-Given the fast pace of progress in latent dynamics modelling over recent years, many models have been presented under a variety of terminologies and proposed frameworks - examples being variational latent recurrent models<sup>[5,9,10,11,12]</sup>, deep state space models<sup>[1,2,3,7,13,14]</sup>, and deterministic encoding-decoding models<sup>[4,15,16]</sup>. Despite differences in appearance, they all adhere to the same conceptual framework of latent variable modelling and state-space disentanglement. As such, here we unify them under the term of Neural SSMs and segment them into the two base choices of probabilistic graphical models that they adhere to: <i>system identification</i> and <i>state estimation</i>. We highlight each PGM's properties and limitations with experimental evaluations on benchmark datasets.
+Given the fast pace of progress in latent dynamics modelling over recent years, many models have been presented under a variety of terminologies and proposed frameworks - examples being variational latent recurrent models<sup>[5,9,10,11,12,22]</sup>, deep state space models<sup>[1,2,3,7,13,14]</sup>, and deterministic encoding-decoding models<sup>[4,15,16]</sup>. Despite differences in appearance, they all adhere to the same conceptual framework of latent variable modelling and state-space disentanglement. As such, here we unify them under the term of Neural SSMs and segment them into the two base choices of probabilistic graphical models that they adhere to: <i>system identification</i> and <i>state estimation</i>. We highlight each PGM's properties and limitations with experimental evaluations on benchmark datasets.
 
 
 <!-- PGM CHOICES -->
@@ -192,6 +192,8 @@ The project's folder structure is as follows:
 <a name="data"></a>
 ## Data
 
+All data used throughout these experiments are available for download <a href="">here</a> on Google Drive, in which they already come in their WebDataset forms. The total sizes of all sets are under a modest 2GB. However, feel free to generate your own sets using the provided data scripts!
+
 <b>Hamiltonian Dynamics</b>: Provided for evaluation is a <a href="https://github.com/webdataset/webdataset">WebDataset</a> dataloader and generation scripts for DeepMind's Hamiltonian Dynamics
 <a href="https://github.com/deepmind/dm_hamiltonian_dynamics_suite">suite</a><sup>[4]</sup>, a simulaton library for 17 different physics datasets that have known underlying Hamiltonian dynamics.
 It comes in the form of color image sequences of arbitrary length, coupled with the systems ground truth states (e.g. for pendulum, angular velocity and angle). It is well-benchmarked and customizable, making it a perfect testbed for latent dynamics function evaluation. For each setting, the physical parameters are tweakable alongside an optional friction coefficient to construct non-energy conserving systems. Location of focal points and color of the object are all individually tuneable, enabling mixed and complex visual datasets of varying latent dynamics.
@@ -202,7 +204,7 @@ It comes in the form of color image sequences of arbitrary length, coupled with 
 For the base presented experiments of this dataset, we consider and evaluate grayscale versions of pendulum and mass spring - which conveniently are just the sliced red channel of the original sets. Each set has `20000` training and `2000` testing trajectories sampled at `Δt = 0.05` intervals. Energy conservation is preserved without friction and we assume constant placement of focal points for simplicity. Note that the modification to color outputs in this framework is as simple as modifying the number of channels in the encoder and decoder.
 
 <p> </p>
-<b>Bouncing Balls</b>: Additionally, we provide a dataloader and generation scripts for the standard latent dynamics dataset of bouncing balls<sup>[1,2,5,7,8]</sup>, modified from the implementation in <a href="https://github.com/simonkamronn/kvae/tree/master/kvae/datasets">[1]</a>. It consists of a ball or multiple balls moving within a bounding box while being affected by a number of potential external effects, e.g. gravitational forces<sup>[1,2,5]</sup>, pong<sup>[2]</sup>, interventions<sup>[8]</sup>. The starting positon, angle, and velocity of the ball(s) are sampled uniformly between a set range. It is generated with the <a href="https://github.com/viblo/pymunk">PyMunk</a> and <a href="https://www.pygame.org/news">PyGame</a> libraries. In this repository we consider two sets - a simple set of one gravitational force and a mixed set of 4 gravitational forces in the cardinal directions with varying strengths. We similarly generate `20000` training and `2000` testing trajectories, however sampled at `Δt = 0.1` intervals.
+<b>Bouncing Balls</b>: Additionally, we provide a dataloader and generation scripts for the standard latent dynamics dataset of bouncing balls<sup>[1,2,5,7,8]</sup>, modified from the implementation in <a href="https://github.com/simonkamronn/kvae/tree/master/kvae/datasets">[1]</a>. It consists of a ball or multiple balls moving within a bounding box while being affected by a number of potential external effects, e.g. gravitational forces<sup>[1,2,5]</sup>, pong<sup>[2]</sup>, interventions<sup>[8]</sup>. The starting positon, angle, and velocity of the ball(s) are sampled uniformly between a set range. It is generated with the <a href="https://github.com/viblo/pymunk">PyMunk</a> and <a href="https://www.pygame.org/news">PyGame</a> libraries. In this repository we consider two sets - a simple set of one gravitational force and a mixed set of 4 gravitational forces in the cardinal directions with varying strengths. We similarly generate <code>20000</code> training and <code>2000</code> testing trajectories, however sampled at <code>Δt = 0.1</code> intervals.
 
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/171948373-ad692ecc-bfac-49dd-86c4-137a2a5e4b73.gif" alt="bouncing ball examples" /></p>
 <p align='center'>Fig N. Single Gravity Boucing Ball Example</p>
@@ -222,30 +224,40 @@ Notably, this system is surprisingly difficult to successfully perform long-term
 <a name="models"></a>    
 ## Models
 
-<ul>
-    <li>VAE Considerations (Stochastic/Deterministic, CNN/MLP/GNN/GCNN/RNN)</li>
-    <li>Latent Dynamics functions (Stochastic/Deterministic, System Identification/State Estimation, Linear/Non-Linear)</li>
-    <li>Available models in this repo (RGN, RGN-Res, GRU, LSTM, NODE, etc)</li>
-</ul>
+Here, details on how the model implementation is structured and running experimnets locally are given. As well, an overview on the abstract class implementation for a general Neural SSM and its types are explained.
 
 ### Implementation Structure
 Provided within this repository is a PyTorch class structure in which an abstract PyTorch-Lightning Module is shared across all the given models, from which the specific VAE and dynamics functions inherit and override the relevant forward functions for training and evaluation. Swapping between dynamics functions and PGM type is as easy as passing in the model's name for arguments, e.g. `python3 train.py --model node`. As the implementation is provided in <a href="https://pytorch-lightning.readthedocs.io/en/latest/">PyTorch-Lightning</a>, an optimization and boilerplate library for PyTorch, it is recommended to be familiar at face-level.
 
 <p> </p>
-For every model run, a new lightning_logs/ version folder is created as well as a new experiment version under `experiments` related to the passed in naming arguments. Hyperparameters passed in for this run are both stored in the Tensorboard instance created as well as in the local file `hparams.yaml`. Default values and available options can be found in `utils/utils.py` or by running `python3 train.py -h`. During training and validation sequences, all of the metrics below are automatically tracked and saved into a Tensorboard instance which can be used to compare different model runs following. Every 5 epochs, reconstruction sequences against the ground truth for a set of samples are saved to the experiments folder. Currently only one checkpoint is saved based on the last epoch ran rather than checkpoints based on best validation score or over a set epochs. Restarting training from a checkpoint or loading in a model for testing is done currently by the `lightning_logs/` ID, e.g. `python3 train.py --ckpt 51`.
+For every model run, a new lightning_logs/ version folder is created as well as a new experiment version under `experiments` related to the passed in naming arguments. Hyperparameters passed in for this run are both stored in the Tensorboard instance created as well as in the local file <code>hparams.yaml</code>. Default values and available options can be found in <code>utils/utils.py</code> or by running <code>python3 train.py -h</code>. During training and validation sequences, all of the metrics below are automatically tracked and saved into a Tensorboard instance which can be used to compare different model runs following. Every 5 epochs, reconstruction sequences against the ground truth for a set of samples are saved to the experiments folder. Currently only one checkpoint is saved based on the last epoch ran rather than checkpoints based on best validation score or over a set epochs. Restarting training from a checkpoint or loading in a model for testing is done currently by the <code>lightning_logs/</code> ID, e.g. <code>python3 train.py --ckpt 51</code>.
 
 <p> </p>
-The implemented dynamics functions are each separated into their respective PGM groups, however they can still share the same general classes. Each dynamics subclass has its own `model_specific_loss` function that allows it to return additional loss values without interrupting the abstract flow. For example, this could be used in a flow-based prior that has additional KL terms over ODE flow density without needing to override the `training_step` function with a duplicate copy.
+The implemented dynamics functions are each separated into their respective PGM groups, however they can still share the same general classes. Each dynamics subclass has its own <code>model_specific_loss</code> function that allows it to return additional loss values without interrupting the abstract flow. For example, this could be used in a flow-based prior that has additional KL terms over ODE flow density without needing to override the <code>training_step</code> function with a duplicate copy.
 
-### Implemented Dymamics
+### Implemented Dynamics
 
 <b>System Identification Models</b>: 
+
+<p> </p>
+For the system identification models, we provide a variety of dynamics functions that resemble the general and special cases detailed above, which are provided in Fig N. below. The most general version is that of the Bayesian Neural ODE, in which a neural ordinary differential equation<sup>[21]</sup> is sampled from a set of optimized distributional parameters and used as the latent dynamics function <code>z<sup>'</sup><sub>t</sub> = f<sub><i>p</i>(θ)</sub>(z<sub>s</sub>)</code><sup>[5]</sup>. A deterministic version of a standard Neural ODE is similarly provided, e.g. <code>z<sup>'</sup><sub>t</sub> = f<sub>θ</sub>(z<sub>s</sub>)</code><sup>[10,21]</sup>. Following that, two forms of a Recurrent Generative Network are provided, a residual version (RGN-Res) and a full-step version (RGN), that represent deterministic and discrete non-linear transition functions. RGN-Res is the equivalent of a Neural ODE using a fixed step Euler integrator while RGN is just a recurrent forward step function. 
+Additionally, a representation of the time-varying Linear-Gaussian SSM transition dynamics<sup>[1,2]</sup> (LGSSM) is provided. And finally, a set of autoregressive models are considered (i.e. Recurrent neural networks, Long-Short Term Memory networks, Gated Recurrent Unit networks) as baselines. Their PyTorch Cell implementations are used and evaluated over the entire sequence, passing in the previously predicted state and observation as its inputs.
+
+<p> </p>
+Training for these models has one mode, that of taking in a number of observational frames to infer <b>z</b><sub>0</sub> and then generating out a number of timesteps autonomously without access to subsequent observations. A likelihood function is compared over the full reconstructed sequence and optimized over. Testing and generation in this setting can be done out to any horizon easily and we provide small sample datasets of <code>1000</code> timesteps to evaluate out to long-horizons.
+
+<p> </p>
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/172108058-481009a0-41c9-449e-bc0f-7b7a45ecefe0.png", height=400, alt="sysID models" /></p>
-<p align='center'>Fig N. Complete model schematic for system identifcation and the implemented dynamics functions.</p>
+<p align='center'>Fig N. Complete model schematic for system identifcation's implemented dynamics functions.</p>
  
 <b>State Estimation Models</b>: 
-<p align='center'><img src="https://user-images.githubusercontent.com/32918812/172108940-b98e5b66-c528-47f6-b6c4-8a0fc955b090.png", height=400, alt="stateEst models" /></p>
-<p align='center'>Fig N. Complete model schematic for state estimation and the implemented dynamics functions.</p>
+
+<p> </p>
+For the state estimation line, we provide a reimplementation of the classic Neural SSM work Deep Kalman Filter<sup>[7]</sup> alongside state estimation versions of the above, provded in Fig. N below. The DKF model modifies the standard Kalman Filter Gaussian transition function to incorporate non-linearity and expressivity by parameterizing the distribution parameters with neural networks <code>z<sub>t</sub>∼<i>N</i>(G(z<sub>t−1</sub>,∆<sub>t</sub>), S(z<sub>t−1</sub>,∆<sub>t</sub>))</code><sup>[7]</sup>. The autoregressive versions for this setting can be viewed as a reimplementation of the Variational Recurrent Neural Network (VRNN), one of the starting state estimation works in Neural SSMs<sup>[22]</sup>. For the latent correction step, we leverage a standard Gated Recurrent Unit (GRU) cell and the corrected latent state is what is passed to the decoder and likelihood function. Notably, there are two settings these models can be run under: <i>reconstruction</i> and <i>generation</i>. <i>Reconstruction</i> is used for training and incorporates ground truth observations to correct the latent state while <i>generation</i> is used to test the forecasting abilities of the model, both short- and long-term.
+
+<p> </p>
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/172186199-602a868b-77e4-44a2-b88d-64124c43afb9.png", height=400, alt="stateEst models" /></p>
+<p align='center'>Fig N. Complete model schematic for state estimation's implemented dynamics functions.</p>
 
 
 <!-- METRICS -->
@@ -316,9 +328,6 @@ This section just consists of to-do's within the repo, contribution guidelines, 
 
 <h4>README-wise</h4>
 
-- Complete ```Introduction``` section with PGM explanations + examples
-- Complete ```Implementation``` section
-    - Model section: description of abstract class, PyTorch-Lightning training, dynamics class inheritance, etc
 - Add guidelines for an ```Experiment``` section highlighting experiments performed in validating the models
 
 <!-- CONTRIBUTIONS -->
@@ -349,3 +358,5 @@ Contributions are welcome and encouraged! If you have an implementation of a lat
 18. Edward De Brouwer, Jaak Simm, Adam Arany, and Yves Moreau. Gru-ode-bayes: Continuous modeling of sporadically-observed time series. Advances in neural information processing systems, 32, 2019.
 19. Ruben Villegas, Jimei Yang, Yuliang Zou, Sungryull Sohn, Xunyu Lin, and Honglak Lee. Learning to generate long-term future via hierarchical prediction. In international conference on machine learning, pages 3560–3569. PMLR, 2017
 20. Xiajun Jiang, Ryan Missel, Maryam Toloubidokhti, Zhiyuan Li, Omar Gharbia, John L Sapp, and Linwei Wang. Label-free physics-informed image sequence reconstruction with disentangled spatial-temporal modeling. In International Conference on Medical Image Computing and Computer-Assisted Intervention, pages 361–371. Springer, 2021.
+21. Ricky TQ Chen, Yulia Rubanova, Jesse Bettencourt, and David K Duvenaud. Neural ordinary differential equations. Advances in neural information processing systems, 31, 2018.
+22. Junyoung Chung, Kyle Kastner, Laurent Dinh, Kratarth Goel, Aaron C Courville, and Yoshua Bengio. A recurrent latent variable model for sequential data. Advances in neural information processing systems, 28, 2015.
