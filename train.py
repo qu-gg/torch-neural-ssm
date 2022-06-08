@@ -18,7 +18,7 @@ def parse_args():
     # Experiment ID
     parser.add_argument('--exptype', type=str, default='pendulum_3latent', help='experiment folder name')
     parser.add_argument('--checkpt', type=str, default='None', help='checkpoint to resume training from')
-    parser.add_argument('--model', type=str, default='node_se', help='which model to use for training')
+    parser.add_argument('--model', type=str, default='meta_det_si', help='which model to use for training')
 
     # Dataset-to-use parameters
     parser.add_argument('--dataset', type=str, default='pendulum', help='dataset name for training')

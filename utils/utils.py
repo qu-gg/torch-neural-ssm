@@ -10,7 +10,13 @@ import torch.nn as nn
 def get_model(name):
     """ Import and return the specific latent dynamics function by the given name"""
     # TODO - Reorganize into two groups for clarity
-    if name == "node_si":
+    if name == "meta_si":
+        from models.system_identification.MetaODE_SI import MetaODE_SI
+        return MetaODE_SI
+    elif name == "meta_det_si":
+        from models.system_identification.MetaODEDet_SI import MetaODEDet_SI
+        return MetaODEDet_SI
+    elif name == "node_si":
         from models.system_identification.NeuralODE_SI import NeuralODE_SI
         return NeuralODE_SI
     if name == "node_se":

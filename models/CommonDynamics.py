@@ -90,14 +90,15 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
 
         # Reconstruction loss
         likelihood = self.reconstruction_loss(preds, images).sum([2, 3]).view([-1]).mean()
-        self.log("likelihood", likelihood, prog_bar=True, on_epoch=True, on_step=False)
+        self.log("likelihood", likelihood, prog_bar=True)
 
         # Initial encoder loss
         klz = self.encoder.kl_z_term()
-        self.log("klz_loss", self.args.z0_beta * klz, prog_bar=True, on_epoch=True, on_step=False)
+        self.log("klz_loss", self.args.z0_beta * klz, prog_bar=True)
 
         # Get the loss terms from the specific latent dynamics loss
         dynamics_loss = self.model_specific_loss()
+        self.log("dynamics_loss", dynamics_loss)
 
         # Build the full loss
         loss = likelihood + (self.args.z0_beta * klz) + dynamics_loss
@@ -183,7 +184,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
 
         # Reconstruction loss
         likelihood = self.reconstruction_loss(preds, images).sum([2, 3]).view([-1]).mean()
-        self.log("val_likelihood", likelihood, prog_bar=True)
+        self.log("val_likelihood", likelihood, prog_bar=True, on_epoch=True, on_step=False)
 
         # Get the loss terms from the specific latent dynamics loss
         dynamics_loss = self.model_specific_loss()
@@ -226,7 +227,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
 
             # Get R^2 over validation set
             embeddings, states = [], []
-            for out in outputs:
+            for out in outputs[::8]:
                 embeddings.append(out['embeddings'])
                 states.append(out['states'])
             embeddings, states = torch.vstack(embeddings), torch.vstack(states)
