@@ -39,9 +39,11 @@ If you found the information helpful for your work or use portions of this repo 
   - [Latent Initial State Z<sub>0</sub> / Z<sub>init</sub>](#initialState)
   - [System Controls, u<sub>t</sub>](#ssmControls)
 - [Implementation](#implementation)
-  - [Data](#data)
+  - [Datasets](#data)
   - [Models](#models)
   - [Metrics](#metrics)
+- [Experiments](#experiments)
+  - [Hyperparameter Tuning](#TO_ADD)
 - [Miscellaneous](#misc)
   - [To-Do](#todo)
   - [Contributions](#contributions)
@@ -110,7 +112,32 @@ Regardless of the precise assumptions, this framework builds a strong latent dyn
 <!-- INITIAL STATE -->
 <a name="initialState"></a>
 ## Latent Initial State Z<sub>0</sub> / Z<sub>init</sub>
-Placeholder text regarding encoders and stacked frames etc etc.
+
+As the transition dynamics and the observation space are intentionally disconnected in this framework, the problem of inferring a strong initial latent state from which to forecast is an important consideration when designing a neural state-space model. This is primarily a task- and data-dependent choice, in which the architecture follows the data structure. Thankfully, much work has been done in other research directions on designing good latent encoding models and works in this area often draw from them. This section is split into three parts - one on the usual architecture for high-dimensional image tasks, one on lower dimensional and/or miscellaneous encoders, and one on the difference between <b>z</b><sub>0</sub> and <b>z</b><sub>init</sub>.
+
+<b>Image-based Encoders</b>: Unsurprisingly, the common architecture used in latent image encoding is a convolutional neural network (CNN) given its inherent bias towards spatial feature extraction<sup>[1,3,4,5]</sup>. Works are mixed between either having the sequential input reshaped as frames stacked over the channel dimension or simply running the CNN over each observed frame separately and passing the concatenated embedding into an output layer. Regardless of methodology, a few frames are assumed as observations for initialization, as multiple timesteps are required to infer the initial system movement. A subset of works consider second-order latent vector spaces, in which the encoder is explicitly split into two individual position and momenta functions, taking single and multiple frames respectively<sup>[5]</sup>.
+
+<a name="initialStateSchematic"></a>
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/173459329-c48b1f65-2b26-4287-96e9-575a4bc8c540.png", width=500, alt="initial state visualization" /></p>
+<p align='center'>Fig N. Visualization of the stacked initial state encoder, modified from [23].</p>
+
+
+<b>Alternate Encoders</b>: In settings with non-image-based inputs, the initial latent encoder can take on a large variety of forms, ranging anywhere from simple linear/MLP networks in physical systems<sup>[5]</sup> to graph convolution networks for latent medical image forecasting<sup>[20]</sup>. Multi-modal and dynamics conditioning inputs can be leveraged via combinations of encoders whose embeddings go through a shared linear function.
+
+<a name="stackedGCNNEncoder"></a>
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/173444301-1d31210a-98a0-40f8-9f78-5db95bcf90c4.png", width=500, alt="alternate encoder visualization" /></p>
+<p align='center'>Fig N. Visualization of the stacked graph convolutional encoder, modified from [24].</p>
+
+
+<b>Variables <b>z</b><sub>0</sub> vs. <b>z</b><sub>init</sub></b>:
+Beyond just the inference of this latent variable, there is one more variation that can be seen throughout literature - that of whether the inferred variable is directly <b>z</b><sub>0</sub> or a pre-forecast variable <b>z</b><sub>init</sub>. For <b>z</b><sub>0</sub>, the initial latent state directly goes through the decoder for the initial reconstructed frame <b>x</b><sub>0</sub> without any interaction with the dynamics function. On the otherhand, <b>z</b><sub>init</sub> represents an abstract initial vector state that the dynamics function starts from to get to <b>z</b><sub>0</sub> and <b>x</b><sub>0</sub>. It is a subtle distinction but potentially has implications for the resulting likelihood optimization and learned vector space. 
+
+<a name="z0vszinit"></a>
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/173461096-4b9611fc-6cb0-4b1c-820b-daa46b2335c1.png", width=500, alt="initial latent variable comparison" /></p>
+<p align='center'>Fig N. Schematic of the difference between <b>z</b><sub>0</sub> and <b>z</b><sub>init</sub></b> formulations.
+
+Saying that, however, there is not much work exploring the considerations for each approach, besides ad-hoc solutions to bridge the gap between the latent encoder and dynamics function distributions<sup>[5]</sup>. This gap can stem from optimization problems caused by imbalanced reconstructions terms between dynamics and initial states or in cases where the initial state distribution is far enough away from the data distribution of downstream frames. A variety of empirical techniques have been proposed to tackle this gap, much in the same spirit of empirical VAE stability 'tricks.' These include separated <b>x</b><sub>0</sub> and <b>x</b><sub>1:T</sub> terms (where <b>x</b><sub>0</sub> has a positive weighting coefficient), VAE pre-training for <b>x</b><sub>0</sub>, and KL-regularization terms between the output distributions of the encoder and the dynamics flow<sup>[1,5]</sup>. One <i>personal</i> intuition regarding these two variable approaches and the tricks applied is that there exists a theoretical trade-off between the two formulations and the tricks applied help to empirically alleviate the shortcomings of either approach. This, however, requires experimentation and validation before any claims can be made.
+
 
 <!-- CONTROLS -->
 <a name="ssmControls"></a>
@@ -287,7 +314,9 @@ where R<sup>N</sup> is the dimension of the output (e.g. number of image channel
 <p align='center'>Fig N. Per-Sequence VPD Equation.</p>
 
 <p> </p>
-<b>R<sup>2</sup> Score</b>: For evaluating systems where the full underlying latent system is available and known (e.g. image translations of Hamiltonian systems), the goodness-of-fit score R<sup>2</sup> can be used per dimension to show how well the latent system of the Neural SSM captures the dynamics in an interpretable way<sup>[1,3]</sup>. This is easiest to leverage in linear transition dynamics. While not studied in rigor, it's possible that non-linear dynamics may be more difficult to interpret with R<sup>2</sup> given the potential complexity of capturing fit quality between a high-dimensional non-linear latent state and single-dimensional physical variables. Ref. [1], while containing linear transition dynamics, mentioned the possibiltiy of non-linear regression via vanilla neural networks and is a possible direction of evaluation.
+<b>R<sup>2</sup> Score</b>: For evaluating systems where the full underlying latent system is available and known (e.g. image translations of Hamiltonian systems), the goodness-of-fit score R<sup>2</sup> can be used per dimension to show how well the latent system of the Neural SSM captures the dynamics in an interpretable way<sup>[1,3]</sup>. This is easiest to leverage in linear transition dynamics. 
+<!-- While not studied in rigor, it's possible that non-linear dynamics may be more difficult to interpret with R<sup>2</sup> given the potential complexity of capturing fit quality between a high-dimensional non-linear latent state and single-dimensional physical variables. -->
+Ref. [1], while containing linear transition dynamics, mentioned the possibiltiy of non-linear regression via vanilla neural networks, though this may run into concerns of regressor capacity and data sizes. Additionally, incorporating metrics derived from latent disentanglement learning may provide stronger evaluation capabilites.
 
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/171448933-45983b30-b2fd-4efc-b058-d8f78050ec53.png" alt="dvbf latent interpretability" /></p>
 <p align='center'>Fig N. DVBF Latent Space Visualization for R<sup>2</sup> scores<sup>[1,3]</sup>.</p>
@@ -311,8 +340,6 @@ This section just consists of to-do's within the repo, contribution guidelines, 
 
 <h4>Repository-wise</h4>
 
-- Make a ```state_estimation/``` folder in ```models/```
-- Make a ```system_identification``` folder in ```models``` and shift current models to it
 - Make a ```requirements.txt``` file for an Anaconda environment
 
 <h4>Model-wise</h4>
@@ -329,6 +356,7 @@ This section just consists of to-do's within the repo, contribution guidelines, 
 <h4>README-wise</h4>
 
 - Add guidelines for an ```Experiment``` section highlighting experiments performed in validating the models
+- Add a section explaining for ```Meta-Learning``` works in Neural SSMs
 
 <!-- CONTRIBUTIONS -->
 <a name="contributions"></a>
@@ -360,3 +388,5 @@ Contributions are welcome and encouraged! If you have an implementation of a lat
 20. Xiajun Jiang, Ryan Missel, Maryam Toloubidokhti, Zhiyuan Li, Omar Gharbia, John L Sapp, and Linwei Wang. Label-free physics-informed image sequence reconstruction with disentangled spatial-temporal modeling. In International Conference on Medical Image Computing and Computer-Assisted Intervention, pages 361–371. Springer, 2021.
 21. Ricky TQ Chen, Yulia Rubanova, Jesse Bettencourt, and David K Duvenaud. Neural ordinary differential equations. Advances in neural information processing systems, 31, 2018.
 22. Junyoung Chung, Kyle Kastner, Laurent Dinh, Kratarth Goel, Aaron C Courville, and Yoshua Bengio. A recurrent latent variable model for sequential data. Advances in neural information processing systems, 28, 2015.
+23. Junbo Zhang, Yu Zheng, and Dekang Qi. Deep spatio-temporal residual networks for citywide crowd flows prediction. In Thirty-first AAAI conference on artificial intelligence, 2017.
+24. Yong Han, Shukang Wang, Yibin Ren, Cheng Wang, Peng Gao, and Ge Chen. Predicting station-level short-term passenger flow in a citywide metro network using spatiotemporal graph convolutional neural networks. ISPRS International Journal of Geo-Information, 8(6):243, 2019
