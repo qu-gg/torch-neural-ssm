@@ -106,8 +106,11 @@ if __name__ == '__main__':
     model_type = get_model(parser.parse_args().model)
     parser = model_type.add_model_specific_args(parser)
 
-    # Parse args and manually specify GPU ranks to train on
+    # Parse args
     arg = parser.parse_args()
+
+    # Set tuning mode to True and manually specify GPU ranks to train on
+    arg.tune = True
     arg.gpus = [0]
 
     # Set a consistent seed over the full set for consistent analysis

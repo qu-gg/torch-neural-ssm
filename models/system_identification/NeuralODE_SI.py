@@ -25,7 +25,7 @@ class ODEFunction(nn.Module):
         self.layers = []
         self.layer_norms = []
         for i, (n_in, n_out) in enumerate(zip(self.layers_dim[:-1], self.layers_dim[1:])):
-            self.acts.append(get_act('leaky_relu') if i < args.num_layers else get_act('linear'))
+            self.acts.append(get_act(args.latent_act) if i < args.num_layers else get_act('linear'))
             self.layers.append(nn.Linear(n_in, n_out, device=args.gpus[0]))
             self.layer_norms.append(nn.LayerNorm(n_out, device=args.gpus[0]) if True and i < args.num_layers else nn.Identity())
 

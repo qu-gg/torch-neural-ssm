@@ -18,13 +18,13 @@ def parse_args():
     # Experiment ID
     parser.add_argument('--exptype', type=str, default='pendulum_3latent', help='experiment folder name')
     parser.add_argument('--checkpt', type=str, default='None', help='checkpoint to resume training from')
-    parser.add_argument('--model', type=str, default='meta_det_si', help='which model to use for training')
+    parser.add_argument('--model', type=str, default='node_se', help='which model to use for training')
 
     # Dataset-to-use parameters
     parser.add_argument('--dataset', type=str, default='pendulum', help='dataset name for training')
     parser.add_argument('--dataset_ver', type=str, default='pendulum_50000samples_65steps',
                         help='dataset version for training')
-    parser.add_argument('--dataset_size', type=int, default=50000, help='dataset name for training')
+    parser.add_argument('--dataset_size', type=int, default=1000, help='dataset name for training')
 
     # Learning parameters
     parser.add_argument('--num_epochs', type=int, default=200, help='number of epochs to run over')
@@ -39,9 +39,9 @@ def parse_args():
     parser.add_argument('--dim', type=int, default=32, help='dimension of the image data')
 
     # Latent network dimensions
-    parser.add_argument('--latent_dim', type=int, default=16, help='latent dimension size')
-    parser.add_argument('--num_layers', type=int, default=4, help='number of layers in the dynamics func')
-    parser.add_argument('--num_hidden', type=int, default=250, help='number of nodes per layer in dynamics func')
+    parser.add_argument('--latent_dim', type=int, default=8, help='latent dimension size')
+    parser.add_argument('--num_layers', type=int, default=2, help='number of layers in the dynamics func')
+    parser.add_argument('--num_hidden', type=int, default=100, help='number of nodes per layer in dynamics func')
     parser.add_argument('--latent_act', type=str, default="leaky_relu", help='type of act func in dynamics func')
 
     # Convolutional dimensions
@@ -63,8 +63,11 @@ if __name__ == '__main__':
     model_type = get_model(parser.parse_args().model)
     parser = model_type.add_model_specific_args(parser)
 
-    # Parse args and manually specify GPU ranks to train on
+    # Parse args
     arg = parser.parse_args()
+
+    # Set tuning mode to True and manually specify GPU ranks to train on
+    arg.tune = False
     arg.gpus = [0]
 
     # Set a consistent seed over the full set for consistent analysis

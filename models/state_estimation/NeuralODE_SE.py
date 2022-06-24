@@ -25,7 +25,7 @@ class ODEFunction(nn.Module):
         self.layers = []
         self.layer_norms = []
         for i, (n_in, n_out) in enumerate(zip(self.layers_dim[:-1], self.layers_dim[1:])):
-            self.acts.append(get_act('leaky_relu') if i < args.num_layers else get_act('linear'))
+            self.acts.append(get_act(args.latent_act) if i < args.num_layers else get_act('linear'))
             self.layers.append(nn.Linear(n_in, n_out, device=args.gpus[0]))
             self.layer_norms.append(nn.LayerNorm(n_out, device=args.gpus[0]) if True and i < args.num_layers else nn.Identity())
 
@@ -62,11 +62,12 @@ class NeuralODE_SE(LatentDynamicsModel):
 
         # Sample z_init
         z_init = self.encoder(x)
+        # z_init = torch.zeros(x.shape[0], self.args.latent_dim).to(self.device)
 
         # Evaluate model forward over T to get L latent reconstructions
-        t = torch.linspace(0, generation_len - 1, generation_len).to(self.device)
+        t = torch.linspace(1, generation_len - 1, generation_len - 1).to(self.device)
 
-        zt = []
+        zt = [z_init]
         prev_z = z_init
         for tidx in t:
             # Propagate forward one timestep with ODE
