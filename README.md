@@ -326,7 +326,7 @@ where R<sup>N</sup> is the dimension of the output (e.g. number of image channel
 Ref. [1], while containing linear transition dynamics, mentioned the possibility of non-linear regression via vanilla neural networks, though this may run into concerns of regressor capacity and data sizes. Additionally, incorporating metrics derived from latent disentanglement learning may provide stronger evaluation capabilities.
 
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/171448933-45983b30-b2fd-4efc-b058-d8f78050ec53.png" alt="dvbf latent interpretability" /></p>
-<p align='center'>Fig N. DVBF Latent Space Visualization for R<sup>2</sup> scores<sup>[1,3]</sup>.</p>
+<p align='center'>Fig N. DVBF Latent Space Visualization for R<sup>2</sup> scores, sourced from [1,3].</p>
 
 
 <!-- EXPERIMENTS -->
