@@ -8,6 +8,8 @@ This repository is meant to conceptually introduce and highlight implementation 
 
 Included is an abstract PyTorch-Lightning training class with several latent dynamic functions that inherit it, as well as common metrics used in their evaluation and training examples on common datasets. Further broken down via implementation is the distinction between <i>system identification</i> and <i>state estimation</i> approaches, which are reminiscent of their classic SSM counterparts and arise from fundamental differences in the underlying choice of their probabilistic graphical model (PGM).
 
+<b>Note</b>: This repo is not fully finished and some of the experiments/sections may be incomplete. This is released as public in order to maximize the potential benefit of this repo and hopefully inspire collaboration in improving it. Feel free to check out the "To-Do" section if you're interesting in contributing!
+
 <a name="pgmSchematic"></a>
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/169753112-bc849b24-fe13-4975-8697-fea95bb19fb5.png" alt="pgm schematic" /></p>
 <p align='center'>Fig 1. Schematic of the two PGM forms of Neural SSMs.</p>
@@ -235,10 +237,10 @@ It comes in the form of color image sequences of arbitrary length, coupled with 
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/171246437-0a1ef292-f90c-4fb7-beb3-82a5e74bb549.gif" alt="pendulum examples" /></p>
 <p align='center'>Fig N. Pendulum-Colors Examples</p>
 
-For the base presented experiments of this dataset, we consider and evaluate grayscale versions of pendulum and mass-spring - which conveniently are just the sliced red channel of the original sets. Each set has `20000` training and `2000` testing trajectories sampled at `Δt = 0.05` intervals. Energy conservation is preserved without friction and we assume constant placement of focal points for simplicity. Note that the modification to color outputs in this framework is as simple as modifying the number of channels in the encoder and decoder.
+For the base presented experiments of this dataset, we consider and evaluate grayscale versions of pendulum and mass-spring - which conveniently are just the sliced red channel of the original sets. Each set has <code>50000</code> training and <code>5000</code> testing trajectories sampled at <code>Δt = 0.05</code> intervals. Energy conservation is preserved without friction and we assume constant placement of focal points for simplicity. Note that the modification to color outputs in this framework is as simple as modifying the number of channels in the encoder and decoder.
 
 <p> </p>
-<b>Bouncing Balls</b>: Additionally, we provide a dataloader and generation scripts for the standard latent dynamics dataset of bouncing balls<sup>[1,2,5,7,8]</sup>, modified from the implementation in <a href="https://github.com/simonkamronn/kvae/tree/master/kvae/datasets">[1]</a>. It consists of a ball or multiple balls moving within a bounding box while being affected by potential external effects, e.g. gravitational forces<sup>[1,2,5]</sup>, pong<sup>[2]</sup>, and interventions<sup>[8]</sup>. The starting position, angle, and velocity of the ball(s) are sampled uniformly between a set range. It is generated with the <a href="https://github.com/viblo/pymunk">PyMunk</a> and <a href="https://www.pygame.org/news">PyGame</a> libraries. In this repository, we consider two sets - a simple set of one gravitational force and a mixed set of 4 gravitational forces in the cardinal directions with varying strengths. We similarly generate <code>20000</code> training and <code>2000</code> testing trajectories, however sample them at <code>Δt = 0.1</code> intervals.
+<b>Bouncing Balls</b>: Additionally, we provide a dataloader and generation scripts for the standard latent dynamics dataset of bouncing balls<sup>[1,2,5,7,8]</sup>, modified from the implementation in <a href="https://github.com/simonkamronn/kvae/tree/master/kvae/datasets">[1]</a>. It consists of a ball or multiple balls moving within a bounding box while being affected by potential external effects, e.g. gravitational forces<sup>[1,2,5]</sup>, pong<sup>[2]</sup>, and interventions<sup>[8]</sup>. The starting position, angle, and velocity of the ball(s) are sampled uniformly between a set range. It is generated with the <a href="https://github.com/viblo/pymunk">PyMunk</a> and <a href="https://www.pygame.org/news">PyGame</a> libraries. In this repository, we consider two sets - a simple set of one gravitational force and a mixed set of 4 gravitational forces in the cardinal directions with varying strengths. We similarly generate <code>50000</code> training and <code>5000</code> testing trajectories, however sample them at <code>Δt = 0.1</code> intervals.
 
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/171948373-ad692ecc-bfac-49dd-86c4-137a2a5e4b73.gif" alt="bouncing ball examples" /></p>
 <p align='center'>Fig N. Single Gravity Bouncing  Ball Example</p>
@@ -338,6 +340,10 @@ This section details some experiments that evaluate the fundamental aspects of N
 <!-- HYPERPARAMETER TUNING -->
 <a name="hyperparameters"></a>
 ## Hyperparameter Tuning
+
+As is common in deep learning and variational inference tasks, the specific choices of hyper-parameters can have a significant impact on the resulting performance and generalization of the model. As such, first we perform a hyper-parameter tuning task for each model on a shared validation set to get eachs' optimized hyper-parameter set. From this, the optimal set for each is carried across the various tasks given similar task complexity. 
+
+We provide a Ray[Tune] tuning script to handle training and formatting the Pytorch-Lightning outputs for each model, found in <code>tune.py</code>. It automatically parallelizes across GPUs and has a convenient Tensorboard output interface to compare the tuning runs. We tune <code>50</code> configurations for each and use the unscaled validation likelihood as the metric of comparison. In order to run custom tuning tasks, simply create a local folder in the repository root directory and rename the tune run "name" to redirect the output there. Please refer to RayTune's relevant <a href="https://docs.ray.io/en/latest/tune/examples/tune-pytorch-lightning.html">documentation</a> for information.
 
 <!-- HAMILTONIAN -->
 <a name="hamiltonian"></a>
