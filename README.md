@@ -172,7 +172,7 @@ For Neural SSMs, a variety of approaches have been taken thus far depending on t
 2. Influencing the vector field gradient (e.g. neural controlled differential equations)<sup>[17]</sup>
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/170079172-b2dd6376-628d-4e15-8282-4ee296cd5b89.png" alt="gradient control" /></p>
 
-3. Introducing another dynamics mechanism, continuous or otherwise (e.g. neural ODE or attention blocks), that is combined with the latent trajectory <b>z<sub>1:T</sub></b> into an auxiliary state <b>h<sub>1:T</sub></b><sup>[8,14]</sup>.
+3. Introducing another dynamics mechanism, continuous or otherwise (e.g. neural ODE or attention blocks), that is combined with the latent trajectory <b>z<sub>1:T</sub></b> into an auxiliary state <b>h<sub>1:T</sub></b><sup>[8,14,25]</sup>.
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/170077468-f183e75f-3ad0-450e-b402-6718087c9b9c.png" alt="continuous control" /></p>
 <p align='center'>Fig N. Visualization of the IMODE architecture, taken from [8].</p>
 
@@ -411,3 +411,5 @@ Contributions are welcome and encouraged! If you have an implementation of a lat
 22. Junyoung Chung, Kyle Kastner, Laurent Dinh, Kratarth Goel, Aaron C Courville, and Yoshua Bengio. A recurrent latent variable model for sequential data. Advances in neural information processing systems, 28, 2015.
 23. Junbo Zhang, Yu Zheng, and Dekang Qi. Deep spatio-temporal residual networks for citywide crowd flows prediction. In Thirty-first AAAI conference on artificial intelligence, 2017.
 24. Yong Han, Shukang Wang, Yibin Ren, Cheng Wang, Peng Gao, and Ge Chen. Predicting station-level short-term passenger flow in a citywide metro network using spatiotemporal graph convolutional neural networks. ISPRS International Journal of Geo-Information, 8(6):243, 2019
+25. Maryam Toloubidokhti, Ryan Missel, Xiajun Jiang, Niels Otani, and Linwei Wang. Neural state-space modeling with latent causal-effect disentanglement. In International Workshop on Machine Learning in Medical Imaging, 2022.
+
