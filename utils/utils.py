@@ -9,6 +9,9 @@ import torch.nn as nn
 
 def get_model(name):
     """ Import and return the specific latent dynamics function by the given name"""
+    # Lowercase name in case of misspellings
+    name = name.lower()
+
     # State Estimation Models
     if name == "node_se":
         from models.state_estimation.NeuralODE_SE import NeuralODE_SE
@@ -19,6 +22,9 @@ def get_model(name):
     elif name == "vrnn":
         from models.state_estimation.VRNN import VRNN
         return VRNN
+    elif name == "dkf":
+        from models.state_estimation.DKF import DKF
+        return DKF
 
     # System Identification Models
     if name == "node_si":
@@ -33,6 +39,12 @@ def get_model(name):
     elif name == "rgn":
         from models.system_identification.RGN import RGN
         return RGN
+    elif name == "dvbf":
+        from models.system_identification.DVBF import DVBF
+        return DVBF
+    elif name == "kvae":
+        from models.system_identification.KVAE import KVAE
+        return KVAE
 
     # Given no correct, raise error
     raise NotImplementedError("Model type {} not implemented.".format(name))

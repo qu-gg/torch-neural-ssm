@@ -373,11 +373,6 @@ This section just consists of to-do's within the repo, contribution guidelines, 
 
 <h4>Model-wise</h4>
 
-- Implement a version of DKF under ```state_estimation/```
-- Implement a version of VRNN under ```state_estimation/```
-- Implement a version of KVAE under ```system_identification``` (or any linear-gaussian SSM method)
-- Implement a version of DVBF under ```system_identification```
-
 <h4>Evaluation-wise</h4>
 
 - Implement latent walk visualizations against data-space observations (like in DVBF)
