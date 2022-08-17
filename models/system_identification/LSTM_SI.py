@@ -40,9 +40,9 @@ class LSTM_SI(LatentDynamicsModel):
         zt = []
         for tidx in t:
             if tidx == 1:
-                z_hid, _ = self.dynamics_func(z_init)
+                z_hid, c_hid = self.dynamics_func(z_init)
             else:
-                z_hid, _ = self.dynamics_func(z)
+                z_hid, c_hid = self.dynamics_func(z, (z_hid, c_hid))
 
             z_hid = self.latent_act(z_hid)
             z = self.dynamics_out(z_hid)

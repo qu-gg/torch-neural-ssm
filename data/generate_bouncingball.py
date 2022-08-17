@@ -1,24 +1,22 @@
 """
-@file generate_bouncingball.py
+@file twomix_gravity.py
 
-Handles generating a WebDataset version of the bouncing ball dataset via simulations in PyGame and tarring
-into an appropriate sharded folder structure
+Handles generating a mixed set of a simple static velocity set (left to right, same initial velocities) alongside
+a single gravity
 """
 import os
-import random
 import pygame
+import random
 import tarfile
 import numpy as np
 import pymunk.pygame_util
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
 
 from tqdm import tqdm
 
 
 class BallBox:
-    def __init__(self, dt=0.2, res=(32, 32), init_pos=(3, 3), init_std=0, wall=None, gravity=(0.0, 0.0),
-                 ball_color="white"):
+    def __init__(self, dt=0.2, res=(32, 32), init_pos=(3, 3), init_std=0, wall=None, gravity=(0.0, 0.0), ball_color="white"):
         pygame.init()
 
         self.ball_color = ball_color
@@ -50,7 +48,7 @@ class BallBox:
         inertia = pymunk.moment_for_circle(1, 0, radius, (0, 0))
         body = pymunk.Body(1, inertia)
         position = np.array(self.initial_position) + self.initial_std * np.random.normal(size=(2,))
-        position = np.clip(position, self.dd + radius + 1, self.res[0] - self.dd - radius - 1)
+        position = np.clip(position, self.dd + radius + 1, self.res[0]-self.dd-radius-1)
         position = position.tolist()
         body.position = position
 
@@ -74,15 +72,15 @@ class BallBox:
             flip_gravity=None, save=None, filepath='../../data/balls.npz', delay=None):
         if save:
             images = np.empty((sequences, iterations, self.res[0], self.res[1]), dtype=np.float32)
-            state = np.empty((sequences, iterations, 4), dtype=np.float32)
+            state = np.empty((sequences, iterations, 2), dtype=np.float32)
 
         dd = 0
-        self.static_lines = [pymunk.Segment(self.space.static_body, (-1, -1), (-1, self.res[1] - dd), 0.0),
-                             pymunk.Segment(self.space.static_body, (-1, -1), (self.res[0] - dd, -1), 0.0),
+        self.static_lines = [pymunk.Segment(self.space.static_body, (-1, -1), (-1, self.res[1]-dd), 0.0),
+                             pymunk.Segment(self.space.static_body, (-1, -1), (self.res[0]-dd, -1), 0.0),
                              pymunk.Segment(self.space.static_body, (self.res[0] - dd, self.res[1] - dd),
-                                            (-1, self.res[1] - dd), 0.0),
+                                            (-1, self.res[1]-dd), 0.0),
                              pymunk.Segment(self.space.static_body, (self.res[0] - dd, self.res[1] - dd),
-                                            (self.res[0] - dd, -1), 0.0)]
+                                            (self.res[0]-dd, -1), 0.0)]
         for line in self.static_lines:
             line.elasticity = 1.0
 
@@ -116,9 +114,8 @@ class BallBox:
                 if save == 'png':
                     pygame.image.save(self.screen, os.path.join(filepath, "bouncing_balls_%02d_%02d.png" % (s, i)))
                 elif save == 'npz':
-                    images[s, i] = pygame.surfarray.array2d(self.screen).swapaxes(1, 0).astype(np.float32) / (
-                                2 ** 24 - 1)
-                    state[s, i] = list(ball.body.position) + list(ball.body.velocity)
+                    images[s, i] = pygame.surfarray.array2d(self.screen).swapaxes(1, 0).astype(np.float32) / (2**24 - 1)
+                    state[s, i] = list(ball.body.velocity) # list(ball.body.position) + # Note that this is done for compatibility with the combined dataset
 
             # Remove the ball and the wall from the space
             self.space.remove(ball, ball.body)
@@ -128,32 +125,28 @@ class BallBox:
 
 if __name__ == '__main__':
     os.environ['SDL_VIDEODRIVER'] = 'dummy'
-    scale = 1
 
-    train_size = 10
-    test_size = 20
-    num_steps = 200
+    # Parameters of generation, resolution and number of samples
+    scale = 1
+    train_size = 10000
+    test_size = 2000
 
     # Arrays to hold sets
     train_images, train_states = [], []
     test_images, test_states = [], []
-    # np.random.seed(1234)
+    np.random.seed(1234)
 
-    # Generate the set
-    cannon = BallBox(dt=0.2, res=(32 * scale, 32 * scale), init_pos=(16 * scale, 16 * scale), init_std=8, wall=None,
-                     gravity=(0.0, -5.0), ball_color="white")
-    i, s = cannon.run(delay=None, iterations=num_steps, sequences=train_size, radius=4, angle_limits=(0, 360),
-                      velocity_limits=(5.0, 15.0), save='npz')
+    # Generate the first set
+    cannon = BallBox(dt=0.2, res=(32*scale, 32*scale), init_pos=(16*scale, 16*scale), init_std=8, wall=None, gravity=(0.0, 0.0), ball_color="white")
+    i, s = cannon.run(delay=None, iterations=65, sequences=train_size, radius=4, angle_limits=(0, 360), velocity_limits=(5.0, 10.0), save='npz')
     i[i > 0] = 1
     i[i == 0] = 0.32
     train_images.append(i)
     train_classes = np.full([i.shape[0], 1], fill_value=2)
     train_states.append(s)
 
-    cannon = BallBox(dt=0.2, res=(32 * scale, 32 * scale), init_pos=(16 * scale, 16 * scale), init_std=8, wall=None,
-                     gravity=(0.0, -5.0), ball_color="white")
-    i, s = cannon.run(delay=None, iterations=num_steps, sequences=test_size, radius=4, angle_limits=(0, 360),
-                      velocity_limits=(5.0, 15.0), save='npz')
+    cannon = BallBox(dt=0.2, res=(32*scale, 32*scale), init_pos=(16*scale, 16*scale), init_std=8, wall=None, gravity=(0.0, 0.0), ball_color="white")
+    i, s = cannon.run(delay=None, iterations=65, sequences=test_size, radius=4, angle_limits=(0, 360), velocity_limits=(5.0, 10.0), save='npz')
     i[i > 0] = 1
     i[i == 0] = 0.32
 
@@ -167,64 +160,84 @@ if __name__ == '__main__':
     test_images = np.concatenate(test_images, axis=0)
     test_states = np.concatenate(test_states, axis=0)
 
+    train_states, test_states = train_states[:, np.newaxis, :, :], test_states[:, np.newaxis, :, :]
     print(train_images.shape, train_classes.shape, test_images.shape)
+    print(f"Images: {train_images.shape} | States: {train_states.shape} | Classes: {train_classes.shape}")
 
     train_size = train_images.shape[0]
     test_size = test_images.shape[0]
 
+    # Plot some examples
+    def movie_to_frame(images):
+        """ Compiles a list of images into one composite frame """
+        n_steps, w, h = images.shape
+        colors = np.linspace(0.4, 1, n_steps)
+        image = np.zeros((w, h))
+        for i, color in zip(images, colors):
+            image = np.clip(image + i * color, 0, color)
+        return image
 
-    # GIF Saving and outputting for sequence
-    def func(i):
-        print(i)
-        plt.imshow(train_images[0][i], cmap='gray')
+    base_dir = "hamiltonian/bouncing_ball/bouncingball_10000samples_65steps/"
 
+    # Make sure all directories are made beforehand
+    if not os.path.exists(f"{base_dir}/examples/"):
+        os.mkdir(f"{base_dir}/examples/")
 
-    fig = plt.figure()
-    animation = FuncAnimation(fig, func, frames=200, interval=30)
-    animation.save("output.gif", writer='ffmpeg', fps=60)
+    if not os.path.exists(f"{base_dir}/train/"):
+        os.mkdir(f"{base_dir}/train/")
+
+    if not os.path.exists(f"{base_dir}/test/"):
+        os.mkdir(f"{base_dir}/test/")
+
+    if not os.path.exists(f"{base_dir}/train_tars/"):
+        os.mkdir(f"{base_dir}/train_tars/")
+
+    if not os.path.exists(f"{base_dir}/test_tars/"):
+        os.mkdir(f"{base_dir}/test_tars/")
+
+    # Grab random samples and save stacked samples from sequence
+    selected_idx = np.random.choice(train_size, 10, replace=False)
+    for idx in selected_idx:
+        plt.imshow(movie_to_frame(train_images[idx]), cmap='gray')
+        plt.savefig(f'{base_dir}/examples/train_{idx}.png')
+
+    selected_idx = np.random.choice(test_size, 10, replace=False)
+    for idx in selected_idx:
+        plt.imshow(movie_to_frame(test_images[idx]), cmap='gray')
+        plt.savefig(f'{base_dir}/examples/test_{idx}.png')
 
     # Permute the sets and states together
     p = np.random.permutation(train_images.shape[0])
     train_images, train_classes, train_states = train_images[p], train_classes[p], train_states[p]
 
     p = np.random.permutation(test_images.shape[0])
-    test_images, test_classes, test_states = test_images[p], test_classes[p], test_states[p]
+    test_images, test_classes, test_states = test_images[p],test_classes[p], test_states[p]
 
     # Save as individual files
     for idx, (i, c, s) in enumerate(zip(train_images, train_classes, train_states)):
-        np.savez(os.path.abspath("bouncingball_10000samples_65steps/train/{}.npz".format(idx)), images=i, state=s,
-                 classes=c)
+        np.savez(os.path.abspath(f"{base_dir}/train/{idx}.npz"), image=i, x=s, class_id=c)
 
     for idx, (i, c, s) in enumerate(zip(test_images, test_classes, test_states)):
-        np.savez(os.path.abspath("bouncingball_10000samples_65steps/test/{}.npz".format(idx)), images=i, state=s,
-                 classes=c)
+        np.savez(os.path.abspath(f"{base_dir}/test/{idx}.npz"), image=i, x=s, class_id=c)
 
-    # Tar train into chunks
-    file_list = os.listdir("bouncingball_10000samples_65steps/train/")
+    # Tar train into chunks for WebDataset
+    file_list = os.listdir(f"{base_dir}/train/")
     random.shuffle(file_list)
 
     n_shards = 1000
     elements_per_shard = len(file_list) // n_shards
-
-    if not os.path.exists("bouncingball_10000samples_65steps/train_tars/"):
-        os.mkdir("bouncingball_10000samples_65steps/train_tars/")
-
     for n in tqdm(range(n_shards)):
-        with tarfile.open("bouncingball_10000samples_65steps/train_tars/{0:04}.tar".format(n), "w:gz") as tar:
+        with tarfile.open(f"{base_dir}/train_tars/{n:0:04}.tar", "w:gz") as tar:
             for file in file_list[n * elements_per_shard: (n + 1) * elements_per_shard]:
-                tar.add("bouncingball_10000samples_65steps/train/{}".format(file))
+                tar.add(f"{base_dir}/train/{file}")
 
-    # Tar test into chunks
-    file_list = os.listdir("bouncingball_10000samples_65steps/test/")
+    # Tar test into chunks for WebDataset
+    file_list = os.listdir(f"{base_dir}/test/")
     random.shuffle(file_list)
 
     n_shards = 1000
     elements_per_shard = len(file_list) // n_shards
-
-    if not os.path.exists("bouncingball_10000samples_65steps/test_tars/"):
-        os.mkdir("bouncingball_10000samples_65steps/test_tars/")
-
     for n in tqdm(range(n_shards)):
-        with tarfile.open("bouncingball_10000samples_65steps/test_tars/{0:04}.tar".format(n), "w:gz") as tar:
+        with tarfile.open(f"{base_dir}/test_tars/{n:0:04}.tar", "w:gz") as tar:
             for file in file_list[n * elements_per_shard: (n + 1) * elements_per_shard]:
-                tar.add("bouncingball_10000samples_65steps/test/{}".format(file))
+                tar.add(f"{base_dir}/test/{file}")

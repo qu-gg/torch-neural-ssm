@@ -16,20 +16,20 @@ def parse_args():
     parser = argparse.ArgumentParser()
 
     # Experiment ID
-    parser.add_argument('--exptype', type=str, default='pendulum_3latent', help='experiment folder name')
+    parser.add_argument('--exptype', type=str, default='pendulum', help='experiment folder name')
     parser.add_argument('--checkpt', type=str, default='None', help='checkpoint to resume training from')
-    parser.add_argument('--model', type=str, default='node_se', help='which model to use for training')
+    parser.add_argument('--model', type=str, default='rgnres', help='which model to use for training')
 
     # Dataset-to-use parameters
     parser.add_argument('--dataset', type=str, default='pendulum', help='dataset name for training')
     parser.add_argument('--dataset_ver', type=str, default='pendulum_50000samples_65steps',
                         help='dataset version for training')
-    parser.add_argument('--dataset_size', type=int, default=1000, help='dataset name for training')
+    parser.add_argument('--dataset_size', type=int, default=50000, help='dataset name for training')
 
     # Learning parameters
     parser.add_argument('--num_epochs', type=int, default=200, help='number of epochs to run over')
     parser.add_argument('--batch_size', type=int, default=32, help='size of batch')
-    parser.add_argument('--learning_rate', type=float, default=5e-4, help='initial learning rate')
+    parser.add_argument('--learning_rate', type=float, default=2e-4, help='initial learning rate')
 
     # Tuning parameters
     parser.add_argument('--z0_beta', type=float, default=0.1, help='multiplier for z0 term in loss')
@@ -39,15 +39,15 @@ def parse_args():
     parser.add_argument('--dim', type=int, default=32, help='dimension of the image data')
 
     # Latent network dimensions
-    parser.add_argument('--latent_dim', type=int, default=8, help='latent dimension size')
-    parser.add_argument('--num_layers', type=int, default=2, help='number of layers in the dynamics func')
-    parser.add_argument('--num_hidden', type=int, default=100, help='number of nodes per layer in dynamics func')
+    parser.add_argument('--latent_dim', type=int, default=24, help='latent dimension size')
+    parser.add_argument('--num_layers', type=int, default=3, help='number of layers in the dynamics func')
+    parser.add_argument('--num_hidden', type=int, default=256, help='number of nodes per layer in dynamics func')
     parser.add_argument('--latent_act', type=str, default="leaky_relu", help='type of act func in dynamics func')
 
     # Convolutional dimensions
     parser.add_argument('--z_amort', type=int, default=5, help='how many X samples to use in z0 inference')
     parser.add_argument('--fix_variance', type=bool, default=False, help='whether to fix variance in z0 encoding')
-    parser.add_argument('--num_filt', type=int, default=8, help='number of filters in the CNNs')
+    parser.add_argument('--num_filt', type=int, default=16, help='number of filters in the CNNs')
 
     # Timesteps of generation
     parser.add_argument('--generation_len', type=int, default=65, help='total length to generate')

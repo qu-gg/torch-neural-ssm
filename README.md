@@ -36,6 +36,7 @@ If you found the information helpful for your work or use portions of this repo 
 - [Citation](#citation)
 - [Table of Contents](#toc)
 - [Background](#background)
+  - [Preliminaries](#prelims)
   - [What are Neural SSMs?](#neuralSSMwhat)
   - [Choice of SSM PGM](#pgmChoice)
   - [Latent Initial State Z<sub>0</sub> / Z<sub>init</sub>](#initialState)
@@ -57,6 +58,14 @@ If you found the information helpful for your work or use portions of this repo 
 # Background
 
 This section provides an introduction to the concept of Neural SSMs, some common considerations and limitations, and active areas of research. This section assumes some familiarity with state-space models, though little background is needed to gain a conceptual understanding if one is already coming from a latent modeling perspective or Bayesian learning. Resources are available in abundance considering the width and depth of state-space usage, however, this <a href="https://www.youtube.com/watch?v=hpeKrMG-WP0">video</a> and <a href="https://github.com/probml/ssm-book">modern textbook</a> are good starting points.
+
+<!-- Preliminaries -->
+<a name="prelims"></a>
+## Preliminaries
+<b>Variational Auto-encoders (VAEs)</b>: VAEs<sup>[28]</sup> provide a principled and popular framework to learn the generative model <i>p</i><sub>θ</sub>(x|z) behind data <b>x</b>, involving latent variables <b>z</b> that follows a prior distribution <i>p</i>(<b>z</b>). Variational inference over the generative model is facilitated by a variational approximation of the posterior density of latent variables <b>z</b>, in the form of a recognition model <i>q</i><sub>φ</sub>(<b>z</b>|<b>x</b>). Parameters of both the generative and recognition models are optimized with the objective to maximize the evidence lower bound (ELBO) of the marginal data likelihood:
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/181783982-0bf100c7-4981-4227-91ad-dfdd6ebdbc9e.png" alt="vae equation" )/></p>
+where the first term encourages the reconstruction of the observed data, and the second term of
+Kullback–Leibler (KL) divergence constrains the estimated posterior density of <i>q</i><sub>φ</sub>(<b>z</b>|<b>x</b>) with a pre-defined prior <i>p</i>(<b>z</b>), often assumed to be a zero-mean isotropic Gaussian density.
 
 <!-- Neural SSM INTRO -->
 <a name="neuralSSMwhat"></a>
@@ -413,3 +422,4 @@ Contributions are welcome and encouraged! If you have an implementation of a lat
 25. Maryam Toloubidokhti, Ryan Missel, Xiajun Jiang, Niels Otani, and Linwei Wang. Neural state-space modeling with latent causal-effect disentanglement. In International Workshop on Machine Learning in Medical Imaging, 2022.
 26. Matthieu Kirchmeyer, Yuan Yin, J ́er ́emie Don`a, Nicolas Baskiotis, Alain Rakotomamonjy, and Patrick Gallinari. Generalizing to new physical systems via context-informed dynamics model. arXiv preprint arXiv:2202.01889, 2022.
 27. Rui Wang, Robin Walters, and Rose Yu. Meta-learning dynamics forecasting using task inference. arXiv preprint arXiv:2102.10271, 2021.
+28. Kingma Diederik P, Welling Max. Auto-encoding variational bayes // arXiv preprint arXiv:1312.6114.2013.

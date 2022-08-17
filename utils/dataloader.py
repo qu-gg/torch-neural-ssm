@@ -66,3 +66,10 @@ class Dataset(pytorch_lightning.LightningDataModule):
     def val_dataloader(self):
         """ Getter function that builds and returns the validation dataloader """
         return self.make_loader(self.validation_urls, "val")
+
+    def test_dataloader(self):
+        """
+        Getter function that builds and returns the testing dataloader
+        (uses val tag for simplicity with a dedicated dataset)
+        """
+        return self.make_loader(self.training_urls, "val")

@@ -44,7 +44,7 @@ def vpt(gt, preds, epsilon=0.010):
         vpts.append(indices[-1])
 
     # Return VPT mean over the total timesteps
-    return np.mean(vpts) / timesteps
+    return np.mean(vpts) / timesteps, np.std(vpts) / timesteps
 
 
 def thresholding(preds, gt):
@@ -116,6 +116,21 @@ def dst(gt, preds):
             results[n, t] = dist
 
     return results, np.mean(results)
+
+
+def vpd(output, target):
+    epsilon = 10
+    mses, _ = dst(output, target)
+    B, T = mses.shape
+    vpdist = np.zeros(B)
+    for i in range(B):
+        idx = np.where(mses[i, :] >= epsilon)[0]
+        if idx.shape[0] > 0:
+            vpdist[i] = np.min(idx)
+        else:
+            vpdist[i] = T
+    vpdist = vpdist / T
+    return vpdist
 
 
 def r2fit(latents, gt_state, mlp=False):

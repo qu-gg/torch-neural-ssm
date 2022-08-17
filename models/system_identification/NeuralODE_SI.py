@@ -21,9 +21,9 @@ class ODEFunction(nn.Module):
         self.layers_dim = [args.latent_dim] + args.num_layers * [args.num_hidden] + [args.latent_dim]
 
         # Build network layers
-        self.acts = []
-        self.layers = []
-        self.layer_norms = []
+        self.acts = nn.ModuleList([])
+        self.layers = nn.ModuleList([])
+        self.layer_norms = nn.ModuleList([])
         for i, (n_in, n_out) in enumerate(zip(self.layers_dim[:-1], self.layers_dim[1:])):
             self.acts.append(get_act(args.latent_act) if i < args.num_layers else get_act('linear'))
             self.layers.append(nn.Linear(n_in, n_out, device=args.gpus[0]))
@@ -42,7 +42,7 @@ class NeuralODE_SI(LatentDynamicsModel):
         super().__init__(args, top, exptop, last_train_idx)
 
         # ODE-Net which holds mixture logic
-        self.ode_func = ODEFunction(args)
+        self.dynamics_func = ODEFunction(args)
 
     def forward(self, x, **kwargs):
         """
@@ -61,7 +61,7 @@ class NeuralODE_SI(LatentDynamicsModel):
         t = torch.linspace(0, generation_len, generation_len + 1).to(self.device)
 
         # Evaluate forward over timestep
-        zt = odeint(self.ode_func, z_init, t, method='rk4', options={'step_size': 0.5})  # [T,q]
+        zt = odeint(self.dynamics_func, z_init, t, method='rk4', options={'step_size': 0.5})  # [T,q]
         zt = zt.permute([1, 0, 2])[:, 1:]
 
         # Stack zt and decode zts
