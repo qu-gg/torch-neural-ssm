@@ -1,4 +1,4 @@
-<h2 align='center'>torchssm</h2>
+<h2 align='center'>torch-neural-ssm</h2>
 <h3 align='center'>Neural State-Space Models and Latent Dynamic Functions <br> for High-Dimensional Generative Time-Series Modeling</h3>
 
 <a name="about"></a>
