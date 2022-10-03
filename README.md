@@ -258,10 +258,10 @@ For the base presented experiments of this dataset, we consider and evaluate gra
 Notably, this system is surprisingly difficult to successfully perform long-term generation on, especially in cases of mixed gravities or multiple objects. Most works only report on generation within 5-15 timesteps following a period of 3-5 observation timesteps<sup>[1,2,7]</sup> and farther timesteps show lost trajectories and/or incoherent reconstructions.
 
 <p> </p>
-<b>Mixing Physics</b>: So far in the literature, the majority of works only consider training Neural SSMs on one system of dynamics at a time - with the most variety lying in that of differing trajectory hyper-parameters. The ability to infer multiple dynamical systems under one model (or learn to output dynamical functions given system observations) and leverage similarities between the sets is an ongoing research pursuit - with applications of neural unit hypernetworks<sup>[27]</sup> and dynamics functions conditioned on sequences via meta-learning<sup>[26]</sup> being the first dives into this.
+<b>Mixing Physics</b>: So far in the literature, the majority of works only consider training Neural SSMs on one system of dynamics at a time - with the most variety lying in that of differing trajectory hyper-parameters. The ability to infer multiple dynamical systems under one model (or learn to output dynamical functions given system observations) and leverage similarities between the sets is an ongoing research pursuit - with applications of neural unit hypernetworks<sup>[27]</sup> and dynamics functions conditioned on sequences via meta-learning<sup>[26,29]</sup> being the first dives into this.
 
 <p> </p>
-<b>Other Sets in Literature</b>: Outside of the previous sets, there are a plethora of other datasets that have been explored in relevant work. The popular task of human motion prediction in both the pose estimation and video generation setting has been considered via datasets <a href="http://vision.imar.ro/human3.6m/pami-h36m.pdf">Human3.6Mil</a>, <a href="http://mocap.cs.cmu.edu/">CMU Mocap</a>, and <a href="https://www.wisdom.weizmann.ac.il/~vision/SpaceTimeActions.html">Weizzman-Action</a><sup>[5,19]</sup>, though proper experimentation into this area would require problem-specific architectures given the depth of the existing field. Past high-dimensionality and image-space, standard benchmark datasets in time-series forecasting have also been considered, including the <a href="https://github.com/Mcompetitions/M4-methods">M4</a>, <a href="https://github.com/zhouhaoyi/ETDataset">Electricity Transformer Temperature (ETT)</a>, and <a href="https://www.nasa.gov/intelligent-systems-division">the NASA Turbofan Degradation</a> set. Recent works have begun looking at medical applications in inverse image reconstruction and the incorporation of physics-inspired priors<sup>[20]</sup>. Regardless of the success of Neural SSMs on these tasks, the task-agnostic factor and principled structure of this framework make it a versatile and appealing option for generative time-series modeling.
+<b>Other Sets in Literature</b>: Outside of the previous sets, there are a plethora of other datasets that have been explored in relevant work. The popular task of human motion prediction in both the pose estimation and video generation setting has been considered via datasets <a href="http://vision.imar.ro/human3.6m/pami-h36m.pdf">Human3.6Mil</a>, <a href="http://mocap.cs.cmu.edu/">CMU Mocap</a>, and <a href="https://www.wisdom.weizmann.ac.il/~vision/SpaceTimeActions.html">Weizzman-Action</a><sup>[5,19]</sup>, though proper experimentation into this area would require problem-specific architectures given the depth of the existing field. Past high-dimensionality and image-space, standard benchmark datasets in time-series forecasting have also been considered, including the <a href="https://github.com/Mcompetitions/M4-methods">M4</a>, <a href="https://github.com/zhouhaoyi/ETDataset">Electricity Transformer Temperature (ETT)</a>, and <a href="https://www.nasa.gov/intelligent-systems-division">the NASA Turbofan Degradation</a> set. Recent works have begun looking at medical applications in inverse image reconstruction and the incorporation of physics-inspired priors<sup>[20,29y ]</sup>. Regardless of the success of Neural SSMs on these tasks, the task-agnostic factor and principled structure of this framework make it a versatile and appealing option for generative time-series modeling.
 
 
 <!-- MODELS -->
@@ -367,9 +367,12 @@ This section just consists of to-do's within the repo, contribution guidelines, 
 <a name="todo"></a>
 ## To-Do
 
-<h4>Repository-wise</h4>
+<h4>Ablations-to-do</h4>
+- Generation lengths used in training (e.g. 1/2/3/5/10 frames)
+- z<sub>0</sub> inference scheme (no overlap, overlap-by-one, full overlap)
+- Use of ODE solvers (fixed, adaptive, tolerances)
 
-- Make a ```requirements.txt``` file for an Anaconda environment
+<h4>Repository-wise</h4>
 
 <h4>Model-wise</h4>
 
@@ -418,3 +421,4 @@ Contributions are welcome and encouraged! If you have an implementation of a lat
 26. Matthieu Kirchmeyer, Yuan Yin, J ́er ́emie Don`a, Nicolas Baskiotis, Alain Rakotomamonjy, and Patrick Gallinari. Generalizing to new physical systems via context-informed dynamics model. arXiv preprint arXiv:2202.01889, 2022.
 27. Rui Wang, Robin Walters, and Rose Yu. Meta-learning dynamics forecasting using task inference. arXiv preprint arXiv:2102.10271, 2021.
 28. Kingma Diederik P, Welling Max. Auto-encoding variational bayes // arXiv preprint arXiv:1312.6114.2013.
+29. Xiajun Jiang, Zhiyuan Li, Ryan Missel, Md Shakil Zaman, Brian Zenger, Wilson W Good, Rob S MacLeod, John L Sapp, and Linwei Wang. Few-shot generation of personalized neural surrogates for cardiac simulation via bayesian meta-learning. In International Conference on Medical Image Computing and Computer-Assisted Intervention, pages 46–56. Springer, 2022.
