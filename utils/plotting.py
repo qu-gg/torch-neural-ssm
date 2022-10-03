@@ -35,14 +35,14 @@ def show_images(images, preds, out_loc, num_out=None):
         # Pad between individual timesteps
         gt = np.pad(gt, pad_width=(
             (0, 0), (5, 5), (0, 5)
-        ), constant_values=0)
+        ), constant_values=1)
 
         gt = np.hstack([i for i in gt])
 
         # Pad between individual timesteps
         pred = np.pad(pred, pad_width=(
             (0, 0), (0, 10), (0, 5)
-        ), constant_values=0)
+        ), constant_values=1)
 
         # Stack timesteps into one image
         pred = np.hstack([i for i in pred])
@@ -57,4 +57,4 @@ def show_images(images, preds, out_loc, num_out=None):
             out_image = np.vstack((out_image, final))
 
     # Save to out location
-    plt.imsave(out_loc, out_image)
+    plt.imsave(out_loc, out_image, cmap='gray')

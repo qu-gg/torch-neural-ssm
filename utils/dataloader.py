@@ -13,21 +13,24 @@ class Dataset(pytorch_lightning.LightningDataModule):
     def __init__(self, args, batch_size=32, workers=0):
         super(Dataset, self).__init__()
         # Get the number of shards used for the given data size
-        shard_size = (args.dataset_size // 50) - 1
+        num_shards = int(args.dataset_percent * 999)
 
         # Build shard paths for the training data
-        bucket = "C:/Users/rxm72/PycharmProjects/torchssm/data/{}/{}/train_tars/".format(args.dataset, args.dataset_ver)
-        shards = "{000.." + str(shard_size) + "}.tar"
+        bucket = os.path.abspath('').replace('\\', '/') + f"/data/{args.dataset}/{args.dataset_ver}/train_tars/"
+        shards = "{000.." + str(num_shards) + "}.tar"
         self.training_urls = os.path.join(bucket, shards)
-        print(self.training_urls)
 
         # Build shard paths for the validation data
-        bucket = "C:/Users/rxm72/PycharmProjects/torchssm/data/{}/{}/test_tars/".format(args.dataset, args.dataset_ver)
-        shards = "{000.." + str(shard_size) + "}.tar"
+        bucket = os.path.abspath('').replace('\\', '/') + f"/data/{args.dataset}/{args.dataset_ver}/val_tars/"
+        shards = "{000.." + str(num_shards) + "}.tar"
         self.validation_urls = os.path.join(bucket, shards)
 
+        # Build shard paths for the testing data
+        bucket = os.path.abspath('').replace('\\', '/') + f"/data/{args.dataset}/{args.dataset_ver}/test_tars/"
+        shards = "{000.." + str(num_shards) + "}.tar"
+        self.testing_urls = os.path.join(bucket, shards)
+
         # Various parameters
-        self.length = args.dataset_size // batch_size
         self.batch_size = batch_size
         self.num_workers = workers
 
@@ -55,21 +58,21 @@ class Dataset(pytorch_lightning.LightningDataModule):
             num_workers=self.num_workers
         )
 
-        loader.length = self.length
-        loader.unbatched().shuffle(1000).batched(self.batch_size)
+        if mode == "train":
+            loader.unbatched().shuffle(1000).batched(self.batch_size, partial=False)
         return loader
 
     def train_dataloader(self):
         """ Getter function that builds and returns the training dataloader """
+        print(f"=> Loading training urls: {self.training_urls}")
         return self.make_loader(self.training_urls, "train")
 
     def val_dataloader(self):
         """ Getter function that builds and returns the validation dataloader """
+        print(f"=> Loading validation urls: {self.validation_urls}")
         return self.make_loader(self.validation_urls, "val")
 
     def test_dataloader(self):
-        """
-        Getter function that builds and returns the testing dataloader
-        (uses val tag for simplicity with a dedicated dataset)
-        """
-        return self.make_loader(self.training_urls, "val")
+        """ Getter function that builds and returns the testing dataloader """
+        print(f"=> Loading testing urls: {self.testing_urls}")
+        return self.make_loader(self.testing_urls, "test")

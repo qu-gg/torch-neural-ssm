@@ -33,6 +33,7 @@ class LatentStateEncoder(nn.Module):
             nn.BatchNorm2d(num_filters * 2),
             nn.LeakyReLU(0.1),
             nn.Conv2d(num_filters * 2, num_filters * 4, kernel_size=5, stride=2, padding=(2, 2)),
+            nn.BatchNorm2d(num_filters * 4),
             nn.Tanh(),
             Flatten(),
             Gaussian(num_filters * 4 ** 3, latent_dim, fix_variance)
@@ -93,13 +94,13 @@ class EmissionDecoder(nn.Module):
             # Perform de-conv to output space
             nn.ConvTranspose2d(self.conv_dim // 16, num_filters * 8, kernel_size=4, stride=1, padding=(0, 0)),
             nn.BatchNorm2d(num_filters * 8),
-            nn.LeakyReLU(),
+            nn.LeakyReLU(0.1),
             nn.ConvTranspose2d(num_filters * 8, num_filters * 4, kernel_size=5, stride=2, padding=(1, 1)),
             nn.BatchNorm2d(num_filters * 4),
-            nn.LeakyReLU(),
+            nn.LeakyReLU(0.1),
             nn.ConvTranspose2d(num_filters * 4, num_filters * 2, kernel_size=5, stride=2, padding=(1, 1), output_padding=(1, 1)),
             nn.BatchNorm2d(num_filters * 2),
-            nn.LeakyReLU(),
+            nn.LeakyReLU(0.1),
             nn.ConvTranspose2d(num_filters * 2, 1, kernel_size=5, stride=1, padding=(2, 2)),
             nn.Sigmoid(),
         )
@@ -110,6 +111,55 @@ class EmissionDecoder(nn.Module):
         :param zts: latent states [BatchSize * GenerationLen, LatentDim]
         :return: data output [BatchSize, GenerationLen, NumChannels, H, W]
         """
+        # Flatten to [BS * SeqLen, -1]
+        zts = zts.contiguous().view([zts.shape[0] * zts.shape[1], -1])
+
+        # Decode back to image space
+        x_rec = self.decoder(zts)
+
+        # Reshape to image output
+        x_rec = x_rec.view([self.batch_size, x_rec.shape[0] // self.batch_size, self.dim, self.dim])
+        return x_rec
+
+
+class LinearDecoder(nn.Module):
+    def __init__(self, batch_size, generation_len, dim, num_filters, num_channels, latent_dim):
+        """
+        Holds the convolutional decoder that takes in a batch of individual latent states and
+        transforms them into their corresponding data space reconstructions
+        """
+        super(LinearDecoder, self).__init__()
+        self.batch_size = batch_size
+        self.generation_len = generation_len
+        self.dim = dim
+        self.num_channels = num_channels
+
+        # Variable that holds the estimated output for the flattened convolution vector
+        self.conv_dim = num_filters * 4 ** 3
+
+        # Emission model handling z_i -> x_i
+        self.decoder = nn.Sequential(
+            # Transform latent vector into 4D tensor for deconvolution
+            nn.Linear(latent_dim, self.conv_dim),
+            nn.BatchNorm1d(self.conv_dim),
+            nn.LeakyReLU(0.1),
+            nn.Linear(self.conv_dim, self.conv_dim * 2),
+            nn.BatchNorm1d(self.conv_dim * 2),
+            nn.LeakyReLU(0.1),
+            nn.Linear(self.conv_dim * 2, self.dim ** 2),
+            nn.Sigmoid(),
+        )
+
+    def forward(self, zts):
+        """
+        Handles decoding a batch of individual latent states into their corresponding data space reconstructions
+        :param zts: latent states [BatchSize * GenerationLen, LatentDim]
+        :return: data output [BatchSize, GenerationLen, NumChannels, H, W]
+        """
+        # Flatten to [BS * SeqLen, -1]
+        zts = zts.contiguous().view([zts.shape[0] * zts.shape[1], -1])
+
+        # Decode back to image space
         x_rec = self.decoder(zts)
 
         # Reshape to image output

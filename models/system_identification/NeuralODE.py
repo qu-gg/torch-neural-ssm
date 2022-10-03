@@ -1,13 +1,12 @@
 """
-@file NeuralODE_SI.py
+@file NeuralODE.py
 
 Holds the model for the Neural ODE latent dynamics function
 """
-import os
 import torch
 import torch.nn as nn
-from torchdiffeq import odeint
 
+from torchdiffeq import odeint
 from utils.utils import get_act
 from models.CommonDynamics import LatentDynamicsModel
 
@@ -36,10 +35,10 @@ class ODEFunction(nn.Module):
         return x
 
 
-class NeuralODE_SI(LatentDynamicsModel):
-    def __init__(self, args, top, exptop, last_train_idx):
+class NeuralODE(LatentDynamicsModel):
+    def __init__(self, args, top, exptop):
         """ Latent dynamics as parameterized by a global deterministic neural ODE """
-        super().__init__(args, top, exptop, last_train_idx)
+        super().__init__(args, top, exptop)
 
         # ODE-Net which holds mixture logic
         self.dynamics_func = ODEFunction(args)
@@ -51,26 +50,23 @@ class NeuralODE_SI(LatentDynamicsModel):
         each sample
         :param x: data observation, which is a timeseries [BS, Timesteps, N Channels, Dim1, Dim2]
         """
-        # Reshape images to combine generation_len and channels
-        generation_len = x.shape[1]
-
         # Sample z_init
         z_init = self.encoder(x)
 
         # Evaluate model forward over T to get L latent reconstructions
-        t = torch.linspace(0, generation_len, generation_len + 1).to(self.device)
+        t = torch.linspace(0, self.args.generation_len - 1, self.args.generation_len).to(self.device)
 
         # Evaluate forward over timestep
-        zt = odeint(self.dynamics_func, z_init, t, method='rk4', options={'step_size': 0.5})  # [T,q]
-        zt = zt.permute([1, 0, 2])[:, 1:]
+        zt = odeint(self.dynamics_func, z_init, t,
+                    method='dopri5', atol=1e-6, rtol=1e-6, options={'max_num_steps': 500, 'dtype': torch.float32}
+                    )  # [T,q]
+        zt = zt.permute([1, 0, 2])
 
         # Stack zt and decode zts
-        x_rec = self.decoder(zt.contiguous().view([zt.shape[0] * zt.shape[1], -1]))
+        x_rec = self.decoder(zt)
         return x_rec, zt
 
     @staticmethod
     def add_model_specific_args(parent_parser):
         """ Placeholder function for model-specific arguments """
-        parser = parent_parser.add_argument_group("NODE")
-        parser.add_argument('--model_file', type=str, default="system_identification/NeuralODE_SI", help='filename of the model')
         return parent_parser

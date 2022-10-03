@@ -36,10 +36,10 @@ class ODEFunction(nn.Module):
         return x
 
 
-class NeuralODE_SE(LatentDynamicsModel):
-    def __init__(self, args, top, exptop, last_train_idx):
+class NeuralODE(LatentDynamicsModel):
+    def __init__(self, args, top, exptop):
         """ Latent dynamics as parameterized by a global deterministic neural ODE """
-        super().__init__(args, top, exptop, last_train_idx)
+        super().__init__(args, top, exptop)
 
         # ODE-Net which holds mixture logic
         self.ode_func = ODEFunction(args)

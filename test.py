@@ -4,8 +4,9 @@
 
 Handles loading in the checkpoint of a model and testing it on a given dataset for metrics, plots, and reconstructions.
 """
-import json
 import os
+import json
+import torch
 import argparse
 import pytorch_lightning
 
@@ -14,28 +15,37 @@ from utils.utils import get_exp_versions, get_model
 
 
 def parse_args():
-    """ General arg parsing for non-model parameters """
+    """ General arg parsing """
     parser = argparse.ArgumentParser()
 
-    # Experiment ID
-    parser.add_argument('--exptype', type=str, default='pendulum_3latent', help='experiment folder name')
-    parser.add_argument('--ckpt_path', type=str, default='experiments_tuned/nODEtuned/')
-    parser.add_argument('--model', type=str, default='node_si', help='which model to use for training')
+    # Experiment ID and Checkpoint to Load
+    parser.add_argument('--exptype', type=str, default='pendulum', help='experiment folder name')
+    parser.add_argument('--ckpt_path', type=str, default='experiments/pendulum/node/version_1/',
+                        help='path to the checkpoints folder')
+    parser.add_argument('--checkpt', type=str, default='epoch31-val_pixel_mse0.0005.ckpt',
+                        help='name a specific checkpoint, will use the last one if none given')
+    parser.add_argument('--dev', type=int, default=0, help='which gpu device to use')
+
+    # Defining which model and model version to use
+    parser.add_argument('--model', type=str, default='node', help='choice of latent dynamics function')
+    parser.add_argument('--system_identification', type=bool, default=True,
+                        help='whether to use (True) system identification or (False) state estimation model versions'
+                             'note that some baselines ignore this parameter and are fixed')
 
     # Dataset-to-use parameters
-    parser.add_argument('--dataset', type=str, default='pendulum', help='dataset name for training')
-    parser.add_argument('--dataset_ver', type=str, default='pendulum_250samples_1000steps',
-                        help='dataset version for training')
-    parser.add_argument('--dataset_size', type=int, default=250, help='dataset name for training')
+    parser.add_argument('--dataset', type=str, default='pendulum', help='dataset folder name')
+    parser.add_argument('--dataset_ver', type=str, default='pendulum_10000samples_200steps', help='dataset version')
+    parser.add_argument('--dataset_percent', type=float, default=1, help='how much of the dataset to use')
 
     # Input dimensions
     parser.add_argument('--dim', type=int, default=32, help='dimension of the image data')
+    parser.add_argument('--batch_size', type=int, default=100, help='batch size for testing')
 
     # Convolutional dimensions
     parser.add_argument('--z_amort', type=int, default=5, help='how many X samples to use in z0 inference')
 
     # Timesteps of generation
-    parser.add_argument('--generation_len', type=int, default=65, help='total length to generate')
+    parser.add_argument('--generation_len', type=int, default=60, help='total length to generate')
     return parser
 
 
@@ -45,7 +55,7 @@ if __name__ == '__main__':
     parser = pytorch_lightning.Trainer.add_argparse_args(parser)
 
     # Get the model type from args and add its specific arguments
-    model_type = get_model(parser.parse_args().model)
+    model_type = get_model(parser.parse_args().model, parser.parse_args().system_identification)
     parser = model_type.add_model_specific_args(parser)
 
     # Parse args
@@ -53,17 +63,18 @@ if __name__ == '__main__':
 
     # Set tuning mode to True and manually specify GPU ranks to train on
     arg.tune = False
-    arg.gpus = [0]
+    arg.gpus = [arg.dev]
 
     # Set a consistent seed over the full set for consistent analysis
     pytorch_lightning.seed_everything(125125125)
 
-    # Build the checkpoint path
-    ckpt_path = f"{arg.ckpt_path}/checkpoints/{os.listdir(f'{arg.ckpt_path}/checkpoints/')[0]}"
-    print(ckpt_path)
-
-    import torch
+    # Build the checkpoint path and load it
+    if arg.checkpt != "None":
+        ckpt_path = arg.ckpt_path + "/checkpoints/" + arg.checkpt
+    else:
+        ckpt_path = f"{arg.ckpt_path}/checkpoints/{os.listdir(f'{arg.ckpt_path}/checkpoints/')[-1]}"
     ckpt = torch.load(ckpt_path)
+    print(ckpt_path)
 
     # Load in hyperparameter JSON and add to argparse NameSpace
     with open(f"{arg.ckpt_path}/params.json", 'r') as f:
@@ -80,7 +91,7 @@ if __name__ == '__main__':
     dataset = Dataset(args=arg, batch_size=arg.batch_size)
 
     # Initialize model
-    model = model_type(arg, top, exptop, dataset.length)
+    model = model_type(arg, top, exptop)
 
     # Initialize pytorch lighthning trainer
     trainer = pytorch_lightning.Trainer.from_argparse_args(arg, max_epochs=1, auto_select_gpus=True)
