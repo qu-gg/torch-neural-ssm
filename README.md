@@ -6,7 +6,8 @@
 
 This repository is meant to conceptually introduce and highlight implementation considerations for the recent class of models called <b>Neural State-Space Models (Neural SSMs)</b>. They leverage the classic state-space model with the flexibility of deep learning to approach high-dimensional generative time-series modeling and learning latent dynamics functions.
 
-Included is an abstract PyTorch-Lightning training class with several latent dynamic functions that inherit it, as well as common metrics used in their evaluation and training examples on common datasets. Further broken down via implementation is the distinction between <i>system identification</i> and <i>state estimation</i> approaches, which are reminiscent of their classic SSM counterparts and arise from fundamental differences in the underlying choice of their probabilistic graphical model (PGM).
+Included is an abstract PyTorch-Lightning training class with several latent dynamic functions that inherit it, as well as common metrics used in their evaluation and training examples on common datasets. Further broken down via implementation is the distinction between <i>system identification</i> and <i>state estimation</i> approaches, which are reminiscent of their classic SSM counterparts and arise from fundamental differences in the underlying choice of their probabilistic graphical model (PGM). 
+This repository (currently) focuses primarily on considerations related to training dynamics models for system identification and forecasting rather than per-frame state estimation or filtering.
 
 <b>Note</b>: This repo is not fully finished and some of the experiments/sections may be incomplete. This is released as public in order to maximize the potential benefit of this repo and hopefully inspire collaboration in improving it. Feel free to check out the "To-Do" section if you're interesting in contributing!
 
@@ -40,6 +41,7 @@ If you found the information helpful for your work or use portions of this repo 
   - [What are Neural SSMs?](#neuralSSMwhat)
   - [Choice of SSM PGM](#pgmChoice)
   - [Latent Initial State Z<sub>0</sub> / Z<sub>init</sub>](#initialState)
+  - [Reconstruction vs. Extrapolation](#reconstructionExtrapolation)
   - [System Controls, u<sub>t</sub>](#ssmControls)
 - [Implementation](#implementation)
   - [Datasets](#data)
@@ -150,6 +152,63 @@ Beyond just the inference of this latent variable, there is one more variation t
 
 Saying that, however, there is not much work exploring the considerations for each approach, besides ad-hoc solutions to bridge the gap between the latent encoder and dynamics function distributions<sup>[5]</sup>. This gap can stem from optimization problems caused by imbalanced reconstruction terms between dynamics and initial states or in cases where the initial state distribution is far enough away from the data distribution of downstream frames. A variety of empirical techniques have been proposed to tackle this gap, much in the same spirit of empirical VAE stability 'tricks.' These include separated <b>x</b><sub>0</sub> and <b>x</b><sub>1:T</sub> terms (where <b>x</b><sub>0</sub> has a positive weighting coefficient), VAE pre-training for <b>x</b><sub>0</sub>, and KL-regularization terms between the output distributions of the encoder and the dynamics flow<sup>[1,5]</sup>. One <i>personal</i> intuition regarding these two variable approaches and the tricks applied is that there exists a theoretical trade-off between the two formulations and the tricks applied help to empirically alleviate the shortcomings of either approach. This, however, requires experimentation and validation before any claims can be made.
 
+<!-- RECONSTRUCTION V EXTRAPOLATION -->
+<a name="reconstructionExtrapolation"></a>
+## Reconstruction vs. Extrapolation
+
+There are three important phases during the forecasting for a neural SSM, that of initial state inference, reconstruction, 
+and extrapolation. 
+
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/194622841-e9dff96e-0594-4102-885b-4d866720e30a.png" alt="reconstruction vs extrapolation" /></p>
+<p align='center'>Fig N. Breakdown of the three forecasting phases - initial state inference, reconstruction, and extrapolation.</p>
+
+<b>Initial State Inference</b>: Inferring the initial state and how many frames are required to get a good
+initialization is fairly domain/problem specific, as each problem may require more or less time to highlight 
+distinctive patterns that enable effective dynamics separation.
+
+<b>Reconstruction</b>: The former refers to the number of timesteps that are used in training, from which the 
+likelihood term is calculated. So far in works, there is no generally agreed upon standard on how many steps to use 
+in this and works can be seen using anywhere from 1 (i.e. next-step prediction) to 60 frames in this portion<sup>[4]</sup>. 
+Some works frame this as a hyper-parameter to tune in experiments and there is a consideration of computational cost 
+when scaling up to longer sequences. In our experiments, we've noticed a linear scaling in training time w.r.t. 
+this sequence length. <i><b>(TO-DO)</b></i> In the Experiments section, we perform an ablation study on how fixed lengths of reconstruction affects the
+extrapolation ability of models on Hamiltonian systems.
+
+<b>Extrapolation</b>: This phase refers to the arbitrarily long forecasting of frames that goes beyond the length used
+in the likelihood term during training. It represents whether a model has captured the system dynamics sufficiently to
+enable long-term forecasting and model long-term energy decay, specifically in non-conserving systems. For specific 
+dynamical systems, this can be a difficult task as, at base, there is no training signal to inform the model to learn
+good extrapolation. Works often highlight metrics independently on reconstruction and extrapolation phases to highlight
+a model's strength of identification<sup>[4]</sup>.
+
+<b>Training Considerations</b>: It is important to note that the exact structure of how the likelihood loss is formulated
+plays a role in how this sequence length may affect extrapolation. Having your likelihood incorporate temporal information
+(e.g. summation over the sequence, trajectory mean, etc.) can have a detrimental effect on extrapolation as the model
+optimizes with respect to the fixed reconstruction length. Figure N highlights an example of using temporal information
+in a likelihood term, where there is near flawless reconstruction but immediate forecasting failure when going towards 
+extrapolation.
+
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/194626532-b328b2c9-d3ee-4078-be06-c4136835a787.png" alt="reconstruction vs extrapolation" /></p>
+<p align='center'>Fig N. Example of failed extrapolation given an incorrect likelihood term. Red highlights beginning of extrapoolation.</p>
+
+As well, it is often the case where the reconstruction training metrics (e.g. likelihood/pixel MSE) and visualizations
+will often show strong convergence despite still poor extrapolation. It can sometimes be the case, especially in Neural ODE 
+latent dynamics, that more training than expected is required to enable strong extrapolation. It is an intuition that 
+the vector field may require a longer optimization than just the reconstruction convergence to be 
+robust against error accumulation that impacts long-horizon forecasting.
+
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/194632777-e133e50e-05f9-4142-abee-44c5dc4d7377.png" alt="reconstruction vs extrapolation" /></p>
+<p align='center'>Fig N. Training vs. Validation pixel MSE metrics, highlight the continued extrapolation learning past training "convergence." </p>
+
+
+<b>Tips for training good extrapolation in these models include</b>:
+<ol>
+<li>Perform extrapolation in your validation steps such that there is a metric to highlight extrapolation learning over training.</li>
+<li>Use per-frame averages in the likelihood function rather than any form with temporal information.</li>
+<li>Use variable lengths of reconstruction during training, sampling 1-T frames to reconstruct in a given batch.</li>
+<li>If you have long sequences, especially in non-conserving systems, sample a random starting point per batch.</li>
+<li>Train for longer than you might expect, even when training metrics have converged for "reconstruction."</li>
+</ol>
 
 <!-- CONTROLS -->
 <a name="ssmControls"></a>
@@ -184,7 +243,6 @@ For Neural SSMs, a variety of approaches have been taken thus far depending on t
 3. Introducing another dynamics mechanism, continuous or otherwise (e.g. neural ODE or attention blocks), that is combined with the latent trajectory <b>z<sub>1:T</sub></b> into an auxiliary state <b>h<sub>1:T</sub></b><sup>[8,14,25]</sup>.
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/170077468-f183e75f-3ad0-450e-b402-6718087c9b9c.png" alt="continuous control" /></p>
 <p align='center'>Fig N. Visualization of the IMODE architecture, taken from [8].</p>
-
 
 <!-- META-LEARNING -->
 <!-- <a name="metaLearning"></a>
@@ -244,7 +302,7 @@ All data used throughout these experiments are available for download <a href=""
 It comes in the form of color image sequences of arbitrary length, coupled with the system's ground truth states (e.g., for pendulum, angular velocity and angle). It is well-benchmarked and customizable, making it a perfect testbed for latent dynamics function evaluation. For each setting, the physical parameters are tweakable alongside an optional friction coefficient to construct non-energy conserving systems. The location of focal points and the color of the objects are all individually tuneable, enabling mixed and complex visual datasets of varying latent dynamics.
 
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/171246437-0a1ef292-f90c-4fb7-beb3-82a5e74bb549.gif" alt="pendulum examples" /></p>
-<p align='center'>Fig N. Pendulum-Colors Examples</p>
+<p align='center'>Fig N. Pendulum-Colors Examples.</p>
 
 For the base presented experiments of this dataset, we consider and evaluate grayscale versions of pendulum and mass-spring - which conveniently are just the sliced red channel of the original sets. Each set has <code>50000</code> training and <code>5000</code> testing trajectories sampled at <code>Δt = 0.05</code> intervals. Energy conservation is preserved without friction and we assume constant placement of focal points for simplicity. Note that the modification to color outputs in this framework is as simple as modifying the number of channels in the encoder and decoder.
 
@@ -252,13 +310,22 @@ For the base presented experiments of this dataset, we consider and evaluate gra
 <b>Bouncing Balls</b>: Additionally, we provide a dataloader and generation scripts for the standard latent dynamics dataset of bouncing balls<sup>[1,2,5,7,8]</sup>, modified from the implementation in <a href="https://github.com/simonkamronn/kvae/tree/master/kvae/datasets">[1]</a>. It consists of a ball or multiple balls moving within a bounding box while being affected by potential external effects, e.g. gravitational forces<sup>[1,2,5]</sup>, pong<sup>[2]</sup>, and interventions<sup>[8]</sup>. The starting position, angle, and velocity of the ball(s) are sampled uniformly between a set range. It is generated with the <a href="https://github.com/viblo/pymunk">PyMunk</a> and <a href="https://www.pygame.org/news">PyGame</a> libraries. In this repository, we consider two sets - a simple set of one gravitational force and a mixed set of 4 gravitational forces in the cardinal directions with varying strengths. We similarly generate <code>50000</code> training and <code>5000</code> testing trajectories, however sample them at <code>Δt = 0.1</code> intervals.
 
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/171948373-ad692ecc-bfac-49dd-86c4-137a2a5e4b73.gif" alt="bouncing ball examples" /></p>
-<p align='center'>Fig N. Single Gravity Bouncing  Ball Example</p>
+<p align='center'>Fig N. Single Gravity Bouncing  Ball Example.</p>
 
 <p> </p>
 Notably, this system is surprisingly difficult to successfully perform long-term generation on, especially in cases of mixed gravities or multiple objects. Most works only report on generation within 5-15 timesteps following a period of 3-5 observation timesteps<sup>[1,2,7]</sup> and farther timesteps show lost trajectories and/or incoherent reconstructions.
 
 <p> </p>
-<b>Mixing Physics</b>: So far in the literature, the majority of works only consider training Neural SSMs on one system of dynamics at a time - with the most variety lying in that of differing trajectory hyper-parameters. The ability to infer multiple dynamical systems under one model (or learn to output dynamical functions given system observations) and leverage similarities between the sets is an ongoing research pursuit - with applications of neural unit hypernetworks<sup>[27]</sup> and dynamics functions conditioned on sequences via meta-learning<sup>[26,29]</sup> being the first dives into this.
+<b>Meta-Learning Datasets</b>: One of the latest research directions for neural SSMs is evaluating the potential of meta-learning to build
+domain-adaptable latent dynamics functions<sup>[26,27,29]</sup>. A representative dataset example for this task is the
+Turbulent Flow dataset that is affected by various buoyancy forces, highlighting a task with partially shared yet heterogeneous
+dynamics<sup>[27]</sup>.  
+
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/194636941-dc86e2a4-fd42-4121-94a2-19fdcb7f79f1.png" alt="turbulent flow examples" height="50%" width="50%" /></p>
+<p align='center'>Fig N. Turbulent Flow Example, sourced from [27].</p>
+
+<p> </p>
+<b>Multi-System Dynamics</b>: So far in the literature, the majority of works only consider training Neural SSMs on one system of dynamics at a time - with the most variety lying in that of differing trajectory hyper-parameters. The ability to infer multiple dynamical systems under one model (or learn to output dynamical functions given system observations) and leverage similarities between the sets is an ongoing research pursuit - with applications of neural unit hypernetworks<sup>[27]</sup> and dynamics functions conditioned on sequences via meta-learning<sup>[26,29]</sup> being the first dives into this.
 
 <p> </p>
 <b>Other Sets in Literature</b>: Outside of the previous sets, there are a plethora of other datasets that have been explored in relevant work. The popular task of human motion prediction in both the pose estimation and video generation setting has been considered via datasets <a href="http://vision.imar.ro/human3.6m/pami-h36m.pdf">Human3.6Mil</a>, <a href="http://mocap.cs.cmu.edu/">CMU Mocap</a>, and <a href="https://www.wisdom.weizmann.ac.il/~vision/SpaceTimeActions.html">Weizzman-Action</a><sup>[5,19]</sup>, though proper experimentation into this area would require problem-specific architectures given the depth of the existing field. Past high-dimensionality and image-space, standard benchmark datasets in time-series forecasting have also been considered, including the <a href="https://github.com/Mcompetitions/M4-methods">M4</a>, <a href="https://github.com/zhouhaoyi/ETDataset">Electricity Transformer Temperature (ETT)</a>, and <a href="https://www.nasa.gov/intelligent-systems-division">the NASA Turbofan Degradation</a> set. Recent works have begun looking at medical applications in inverse image reconstruction and the incorporation of physics-inspired priors<sup>[20,29y ]</sup>. Regardless of the success of Neural SSMs on these tasks, the task-agnostic factor and principled structure of this framework make it a versatile and appealing option for generative time-series modeling.
@@ -325,7 +392,7 @@ For the state estimation line, we provide a reimplementation of the classic Neur
 where R<sup>N</sup> is the dimension of the output (e.g. number of image channels) and s, s<sub>hat</sub> are the subsets of "active" predicted pixels.
 
 <p> </p>
-<b>Valid Prediction Distance (VPD)</b>: Similar in spirit to how VPT leverages MSE, VPD is the minimum timestep in which the DST metric surpasses a pre-defined epsilon. This is useful in tracking how long a model can generate an object in a physical system before either incorrect trajectories and/or error accumulation cause significant divergence.
+<b>Valid Prediction Distance (VPD)</b>: Similar in spirit to how VPT leverages MSE, VPD is the minimum timestep in which the DST metric surpasses a pre-defined epsilon<sup>[29]</sup>. This is useful in tracking how long a model can generate an object in a physical system before either incorrect trajectories and/or error accumulation cause significant divergence.
 
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/169961714-2d007dbd-92f2-4ec7-aff0-3c383f21e919.png" alt="vpd equation" /></p>
 <p align='center'>Fig N. Per-Sequence VPD Equation.</p>
@@ -369,6 +436,7 @@ This section just consists of to-do's within the repo, contribution guidelines, 
 
 <h4>Ablations-to-do</h4>
 - Generation lengths used in training (e.g. 1/2/3/5/10 frames)
+- Fixed vs variable generation lengths
 - z<sub>0</sub> inference scheme (no overlap, overlap-by-one, full overlap)
 - Use of ODE solvers (fixed, adaptive, tolerances)
 
