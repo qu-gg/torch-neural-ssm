@@ -8,6 +8,7 @@ import argparse
 import pytorch_lightning
 
 from utils.dataloader import Dataset
+from distutils.util import strtobool
 from utils.utils import get_exp_versions, get_model
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, LearningRateMonitor
 
@@ -34,7 +35,7 @@ def parse_args():
     parser.add_argument('--batches_to_save', type=int, default=25, help='how many batches to output per epoch')
 
     # Learning parameters
-    parser.add_argument('--num_epochs', type=int, default=500, help='number of epochs to run')
+    parser.add_argument('--num_epochs', type=int, default=249, help='number of epochs to run')
     parser.add_argument('--batch_size', type=int, default=32, help='size of batch')
     parser.add_argument('--learning_rate', type=float, default=5e-4, help='initial learning rate')
 
@@ -54,10 +55,14 @@ def parse_args():
 
     # Z0 inference parameters
     parser.add_argument('--z_amort', type=int, default=5, help='how many true frames to use in z0 inference')
-    parser.add_argument('--fix_variance', type=bool, default=False, help='whether to fix variance in z0 encoding')
+    parser.add_argument('--fix_variance', type=lambda x: bool(strtobool(x)),
+                        default=False, help='whether to fix variance in z0 encoding')
 
     # Timesteps to generate out
     parser.add_argument('--generation_len', type=int, default=30, help='total length to generate (including z_amort)')
+    parser.add_argument('--generation_varying', type=lambda x: bool(strtobool(x)),
+                        default=True, help='whether to vary the generation_len/batch')
+    parser.add_argument('--generation_validation_len', type=int, default=30, help='total length to generate for validation')
     return parser
 
 
@@ -105,7 +110,7 @@ if __name__ == '__main__':
                                                                lr_monitor,
                                                                checkpoint_callback
                                                            ],
-                                                           max_epochs=arg.num_epochs, check_val_every_n_epoch=4,
+                                                           max_epochs=arg.num_epochs, check_val_every_n_epoch=10,
                                                            auto_select_gpus=True, reload_dataloaders_every_n_epochs=10)
     # Start training from scratch or a checkpoint
     if arg.ckpt_path == 'None':

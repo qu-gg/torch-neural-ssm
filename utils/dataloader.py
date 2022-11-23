@@ -43,13 +43,21 @@ class Dataset(pytorch_lightning.LightningDataModule):
         """
         shuffle = 1000 if mode == "train" else 0
 
-        dataset = (
-            wds.WebDataset(urls, shardshuffle=True)
-            .shuffle(shuffle)
-            .decode("rgb")
-            .to_tuple("npz")
-            .batched(self.batch_size, partial=False)
-        )
+        if mode == "train":
+            dataset = (
+                wds.WebDataset(urls, shardshuffle=True)
+                    .shuffle(shuffle)
+                    .decode("rgb")
+                    .to_tuple("npz")
+                    .batched(self.batch_size, partial=False)
+            )
+        else:
+            dataset = (
+                wds.WebDataset(urls, shardshuffle=False)
+                    .decode("rgb")
+                    .to_tuple("npz")
+                    .batched(self.batch_size, partial=False)
+            )
 
         loader = wds.WebLoader(
             dataset,

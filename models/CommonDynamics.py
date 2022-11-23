@@ -51,11 +51,11 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
 
     def forward(self, x, generation_len):
         """ Placeholder function for the dynamics forward pass """
-        raise NotImplementedError("In forward: Latent Dynamics function not specified.")
+        raise NotImplementedError("In forward function: Latent Dynamics function not specified.")
 
     def model_specific_loss(self, x, x_rec, zts, train=True):
         """ Placeholder function for any additional loss terms a dynamics function may have """
-        return 0
+        return 0.0
 
     def model_specific_plotting(self, version_path, outputs):
         """ Placeholder function for any additional plots a dynamics function may have """
@@ -72,27 +72,13 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         for EM-optimization procedures based on the PGM.
 
         By default, we assume a joint optim with the Adam Optimizer. We additionally include LR Warmup and
-        StepLR decay for standard learning rate care during training.
+        CosineAnnealing with decay for standard learning rate care during training.
         """
         optim = torch.optim.AdamW(self.parameters(), lr=self.args.learning_rate)
-        # warmup_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, T_max=1000, verbose=True)
-        # decay_scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=25, gamma=0.75, verbose=True)
-        #
-        # warmup_scheduler = {
-        #     'scheduler': warmup_scheduler,
-        #     'frequency': 1,
-        #     'interval': 'step'
-        # }
-        #
-        # decay_scheduler = {
-        #     'scheduler': decay_scheduler,
-        #     'frequency': 5,
-        #     'interval': 'epoch'
-        # }
-
         scheduler = CosineAnnealingWarmRestartsWithDecayAndLinearWarmup(optim, T_0=3000, T_mult=1,
                                                                         warmup_steps=600, decay=0.90)
 
+        # Explicit dictionary to state how often to ping the scheduler
         scheduler = {
             'scheduler': scheduler,
             'frequency': 1,
@@ -198,8 +184,8 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         :param batch: list of dictionary objects representing a single image
         :param batch_idx: how far in the epoch this batch is
         """
-        # Sample a random generation length from [1, T] for this batch
-        generation_len = np.random.randint(1, self.args.generation_len)
+        # Get the generation length - either fixed or random between [1,T] depending on flags
+        generation_len = np.random.randint(1, self.args.generation_len) if self.args.generation_varying is True else self.args.generation_len
 
         # Get model outputs from batch
         images, images_rev, states, labels, preds, embeddings = self.get_step_outputs(batch, generation_len)
@@ -243,7 +229,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         # Every 4 epochs, get a reconstruction example, model-specific plots, and copy over to the experiments folder
         :param outputs: list of outputs from the training steps, with the last 25 steps having reconstructions
         """
-        if self.current_epoch % 2 != 0:
+        if self.current_epoch % 10 != 0:
             return
 
         # Show side-by-side reconstructions
@@ -267,7 +253,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         :param batch_idx: how far in the epoch this batch is
         """
         # Get model outputs from batch
-        images, images_rev, states, labels, preds, embeddings = self.get_step_outputs(batch, self.args.generation_len * 2)
+        images, images_rev, states, labels, preds, embeddings = self.get_step_outputs(batch, self.args.generation_validation_len)
 
         # Get model loss terms for the step
         likelihood, klz, dynamics_loss = self.get_step_losses(images, images_rev, preds)

@@ -35,8 +35,10 @@ class LatentStateEncoder(nn.Module):
             nn.Conv2d(num_filters * 2, num_filters * 4, kernel_size=5, stride=2, padding=(2, 2)),
             nn.BatchNorm2d(num_filters * 4),
             nn.Tanh(),
+            # nn.AvgPool2d(3),
             Flatten(),
             Gaussian(num_filters * 4 ** 3, latent_dim, fix_variance)
+            # Gaussian(64, latent_dim, fix_variance)
         )
 
         # Holds generated z0 means and logvars for use in KL calculations
