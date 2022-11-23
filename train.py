@@ -9,7 +9,7 @@ import pytorch_lightning
 
 from utils.dataloader import Dataset
 from utils.utils import get_exp_versions, get_model
-from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, LearningRateMonitor
 
 
 def parse_args():
@@ -17,7 +17,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
 
     # Experiment ID and Checkpoint to Load
-    parser.add_argument('--exptype', type=str, default='pendulum', help='experiment folder name')
+    parser.add_argument('--exptype', type=str, default='cosine_annealing_LRdecay', help='experiment folder name')
     parser.add_argument('--ckpt_path', type=str, default='None', help='checkpoint to resume training from')
     parser.add_argument('--dev', type=int, default=0, help='which gpu device to use')
 
@@ -29,12 +29,12 @@ def parse_args():
 
     # Dataset-to-use parameters
     parser.add_argument('--dataset', type=str, default='pendulum', help='dataset folder name')
-    parser.add_argument('--dataset_ver', type=str, default='pendulum_10000samples_200steps', help='dataset version')
+    parser.add_argument('--dataset_ver', type=str, default='pendulum_12500samples_200steps_dt01', help='dataset version')
     parser.add_argument('--dataset_percent', type=int, default=1.0, help='percent of dataset to use')
     parser.add_argument('--batches_to_save', type=int, default=25, help='how many batches to output per epoch')
 
     # Learning parameters
-    parser.add_argument('--num_epochs', type=int, default=50, help='number of epochs to run')
+    parser.add_argument('--num_epochs', type=int, default=500, help='number of epochs to run')
     parser.add_argument('--batch_size', type=int, default=32, help='size of batch')
     parser.add_argument('--learning_rate', type=float, default=5e-4, help='initial learning rate')
 
@@ -46,9 +46,9 @@ def parse_args():
     parser.add_argument('--dim', type=int, default=32, help='dimension of the image data')
 
     # Network dimensions
-    parser.add_argument('--latent_dim', type=int, default=24, help='latent dimension size')
-    parser.add_argument('--latent_act', type=str, default="leaky_relu", help='type of act func in dynamics func')
-    parser.add_argument('--num_layers', type=int, default=3, help='number of layers in the dynamics func')
+    parser.add_argument('--latent_dim', type=int, default=32, help='latent dimension size')
+    parser.add_argument('--latent_act', type=str, default="swish", help='type of act func in dynamics func')
+    parser.add_argument('--num_layers', type=int, default=4, help='number of layers in the dynamics func')
     parser.add_argument('--num_hidden', type=int, default=256, help='number of nodes per layer in dynamics func')
     parser.add_argument('--num_filt', type=int, default=16, help='number of filters in the CNNs')
 
@@ -57,7 +57,7 @@ def parse_args():
     parser.add_argument('--fix_variance', type=bool, default=False, help='whether to fix variance in z0 encoding')
 
     # Timesteps to generate out
-    parser.add_argument('--generation_len', type=int, default=10, help='total length to generate (including z_amort)')
+    parser.add_argument('--generation_len', type=int, default=30, help='total length to generate (including z_amort)')
     return parser
 
 
@@ -95,11 +95,18 @@ if __name__ == '__main__':
                                           filename='epoch{epoch:02d}-val_pixel_mse{val_pixel_mse:.4f}',
                                           auto_insert_metric_name=False, save_last=True)
     early_stop_callback = EarlyStopping(monitor="val_pixel_mse", min_delta=0.0005, patience=10, mode="min")
+    lr_monitor = LearningRateMonitor(logging_interval='step')
 
     # Initialize trainer
-    trainer = pytorch_lightning.Trainer.from_argparse_args(arg, callbacks=[early_stop_callback, checkpoint_callback],
+    trainer = pytorch_lightning.Trainer.from_argparse_args(arg,
+                                                           callbacks=
+                                                           [
+                                                               # early_stop_callback,
+                                                               lr_monitor,
+                                                               checkpoint_callback
+                                                           ],
                                                            max_epochs=arg.num_epochs, check_val_every_n_epoch=4,
-                                                           auto_select_gpus=True, reload_dataloaders_every_epoch=True)
+                                                           auto_select_gpus=True, reload_dataloaders_every_n_epochs=10)
     # Start training from scratch or a checkpoint
     if arg.ckpt_path == 'None':
         trainer.fit(model, dataset)

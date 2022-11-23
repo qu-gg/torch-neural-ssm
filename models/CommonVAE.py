@@ -28,10 +28,10 @@ class LatentStateEncoder(nn.Module):
         self.initial_encoder = nn.Sequential(
             nn.Conv2d(z_amort, num_filters, kernel_size=5, stride=2, padding=(2, 2)),  # 14,14
             nn.BatchNorm2d(num_filters),
-            nn.LeakyReLU(0.1),
+            nn.LeakyReLU(),
             nn.Conv2d(num_filters, num_filters * 2, kernel_size=5, stride=2, padding=(2, 2)),  # 7,7
             nn.BatchNorm2d(num_filters * 2),
-            nn.LeakyReLU(0.1),
+            nn.LeakyReLU(),
             nn.Conv2d(num_filters * 2, num_filters * 4, kernel_size=5, stride=2, padding=(2, 2)),
             nn.BatchNorm2d(num_filters * 4),
             nn.Tanh(),
@@ -83,25 +83,60 @@ class EmissionDecoder(nn.Module):
         # Variable that holds the estimated output for the flattened convolution vector
         self.conv_dim = num_filters * 4 ** 3
 
+        # # Emission model handling z_i -> x_i
+        # self.decoder = nn.Sequential(
+        #     # Transform latent vector into 4D tensor for deconvolution
+        #     nn.Linear(latent_dim, self.conv_dim),
+        #     nn.BatchNorm1d(self.conv_dim),
+        #     nn.LeakyReLU(),
+        #     UnFlatten(4),
+        #
+        #     # Perform de-conv to output space
+        #     nn.ConvTranspose2d(self.conv_dim // 16, num_filters * 8, kernel_size=4, stride=1, padding=(0, 0)),
+        #     nn.BatchNorm2d(num_filters * 8),
+        #     nn.LeakyReLU(),
+        #     nn.ConvTranspose2d(num_filters * 8, num_filters * 4, kernel_size=5, stride=2, padding=(1, 1)),
+        #     nn.BatchNorm2d(num_filters * 4),
+        #     nn.LeakyReLU(),
+        #     nn.ConvTranspose2d(num_filters * 4, num_filters * 2, kernel_size=5, stride=2, padding=(1, 1), output_padding=(1, 1)),
+        #     nn.BatchNorm2d(num_filters * 2),
+        #     nn.LeakyReLU(),
+        #     nn.ConvTranspose2d(num_filters * 2, 1, kernel_size=5, stride=1, padding=(2, 2)),
+        #     nn.Sigmoid(),
+        # )
+
         # Emission model handling z_i -> x_i
         self.decoder = nn.Sequential(
             # Transform latent vector into 4D tensor for deconvolution
             nn.Linear(latent_dim, self.conv_dim),
             nn.BatchNorm1d(self.conv_dim),
-            nn.LeakyReLU(0.1),
+            nn.LeakyReLU(),
             UnFlatten(4),
 
             # Perform de-conv to output space
             nn.ConvTranspose2d(self.conv_dim // 16, num_filters * 8, kernel_size=4, stride=1, padding=(0, 0)),
             nn.BatchNorm2d(num_filters * 8),
-            nn.LeakyReLU(0.1),
+            nn.LeakyReLU(),
+            nn.Conv2d(num_filters * 8, num_filters * 8, kernel_size=4, stride=1, padding="same"),
+            nn.BatchNorm2d(num_filters * 8),
+            nn.LeakyReLU(),
+
             nn.ConvTranspose2d(num_filters * 8, num_filters * 4, kernel_size=5, stride=2, padding=(1, 1)),
             nn.BatchNorm2d(num_filters * 4),
-            nn.LeakyReLU(0.1),
+            nn.LeakyReLU(),
+            nn.Conv2d(num_filters * 4, num_filters * 4, kernel_size=5, stride=1, padding="same"),
+            nn.BatchNorm2d(num_filters * 4),
+            nn.LeakyReLU(),
+
             nn.ConvTranspose2d(num_filters * 4, num_filters * 2, kernel_size=5, stride=2, padding=(1, 1), output_padding=(1, 1)),
             nn.BatchNorm2d(num_filters * 2),
-            nn.LeakyReLU(0.1),
+            nn.LeakyReLU(),
+            nn.Conv2d(num_filters * 2, num_filters * 2, kernel_size=5, stride=1, padding="same"),
+            nn.BatchNorm2d(num_filters * 2),
+            nn.LeakyReLU(),
+
             nn.ConvTranspose2d(num_filters * 2, 1, kernel_size=5, stride=1, padding=(2, 2)),
+            nn.Conv2d(1, 1, kernel_size=5, stride=1, padding="same"),
             nn.Sigmoid(),
         )
 
@@ -142,10 +177,10 @@ class LinearDecoder(nn.Module):
             # Transform latent vector into 4D tensor for deconvolution
             nn.Linear(latent_dim, self.conv_dim),
             nn.BatchNorm1d(self.conv_dim),
-            nn.LeakyReLU(0.1),
+            nn.LeakyReLU(),
             nn.Linear(self.conv_dim, self.conv_dim * 2),
             nn.BatchNorm1d(self.conv_dim * 2),
-            nn.LeakyReLU(0.1),
+            nn.LeakyReLU(),
             nn.Linear(self.conv_dim * 2, self.dim ** 2),
             nn.Sigmoid(),
         )

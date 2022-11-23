@@ -12,9 +12,9 @@ import numpy as np
 import torch.nn as nn
 import pytorch_lightning
 
-from utils.plotting import show_images
-from utils.metrics import vpt, dst, r2fit, vpd
-from utils.utils import determine_annealing_factor
+from utils.plotting import show_images, get_embedding_trajectories
+from utils.metrics import vpt, dst, r2fit, vpd, normalized_pixel_mse
+from utils.utils import determine_annealing_factor, CosineAnnealingWarmRestartsWithDecayAndLinearWarmup
 from models.CommonVAE import LatentStateEncoder, EmissionDecoder
 
 
@@ -49,7 +49,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         # Losses
         self.reconstruction_loss = nn.MSELoss(reduction='none')
 
-    def forward(self, x):
+    def forward(self, x, generation_len):
         """ Placeholder function for the dynamics forward pass """
         raise NotImplementedError("In forward: Latent Dynamics function not specified.")
 
@@ -75,9 +75,30 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         StepLR decay for standard learning rate care during training.
         """
         optim = torch.optim.AdamW(self.parameters(), lr=self.args.learning_rate)
-        warmup_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, T_max=1000)
-        decay_scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=15, gamma=0.50)
-        return [optim], [warmup_scheduler, decay_scheduler]
+        # warmup_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, T_max=1000, verbose=True)
+        # decay_scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=25, gamma=0.75, verbose=True)
+        #
+        # warmup_scheduler = {
+        #     'scheduler': warmup_scheduler,
+        #     'frequency': 1,
+        #     'interval': 'step'
+        # }
+        #
+        # decay_scheduler = {
+        #     'scheduler': decay_scheduler,
+        #     'frequency': 5,
+        #     'interval': 'epoch'
+        # }
+
+        scheduler = CosineAnnealingWarmRestartsWithDecayAndLinearWarmup(optim, T_0=3000, T_mult=1,
+                                                                        warmup_steps=600, decay=0.90)
+
+        scheduler = {
+            'scheduler': scheduler,
+            'frequency': 1,
+            'interval': 'step'
+        }
+        return [optim], [scheduler]
 
     def on_train_start(self):
         """
@@ -109,11 +130,24 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         if not os.path.exists(f"{self.version_path}/images/"):
             os.mkdir(f"{self.version_path}/images/")
 
-    def get_step_outputs(self, batch):
+    def on_validation_start(self):
+        """
+        Extra check to make sure the version path variable is set when restarting from a given checkpoint.
+        Sometimes it can start on a reconstruction-based epoch and cause errors without this check.
+        """
+        # Get local version path from absolute directory
+        self.version_path = f"{os.path.abspath('')}/lightning_logs/version_{self.top}/"
+
+        # Make image dir in lightning experiment folder if it doesn't exist
+        if not os.path.exists(f"{self.version_path}/images/"):
+            os.mkdir(f"{self.version_path}/images/")
+
+    def get_step_outputs(self, batch, generation_len):
         """
         Handles the process of pre-processing and subsequence sampling a batch,
         as well as getting the outputs from the models regardless of step
         :param batch: list of dictionary objects representing a single image
+        :param generation_len: how far out to generate for, dependent on the step (train/val)
         :return: processed model outputs
         """
         # Stack batch and restrict to generation length
@@ -122,17 +156,17 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         labels = torch.stack([b['class_id'] for b in batch[0]])
 
         # Same random portion of the sequence over generation_len, saving room for backwards solving
-        random_start = np.random.randint(self.args.generation_len, images.shape[1] - self.args.z_amort - self.args.generation_len)
+        random_start = np.random.randint(generation_len, images.shape[1] - self.args.z_amort - generation_len)
 
         # Get forward sequences
-        images = images[:, random_start:random_start + self.args.generation_len + self.args.z_amort]
-        states = states[:, random_start:random_start + self.args.generation_len + self.args.z_amort]
+        images = images[:, random_start:random_start + generation_len + self.args.z_amort]
+        states = states[:, random_start:random_start + generation_len + self.args.z_amort]
 
         # Get backwards sequence
         images_rev = torch.flip(images, dims=[1])
 
         # Get predictions
-        preds, embeddings = self(images)
+        preds, embeddings = self(images, generation_len)
 
         # Restrict images to start from after inference, for metrics and likelihood
         images = images[:, self.args.z_amort:]
@@ -148,7 +182,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         :return: likelihood, kl on z0, model-specific dynamics loss
         """
         # Reconstruction loss for the sequence and z0
-        likelihood = self.reconstruction_loss(preds, images).sum([2, 3]).mean([1]).mean([0])
+        likelihood = self.reconstruction_loss(preds, images).sum([2, 3]).mean() # .mean([1]).mean([0])
 
         # Initial encoder loss, KL[q(z_K|x_0:K) || p(z_K)]
         klz = self.encoder.kl_z_term()
@@ -164,8 +198,11 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         :param batch: list of dictionary objects representing a single image
         :param batch_idx: how far in the epoch this batch is
         """
+        # Sample a random generation length from [1, T] for this batch
+        generation_len = np.random.randint(1, self.args.generation_len)
+
         # Get model outputs from batch
-        images, images_rev, states, labels, preds, embeddings = self.get_step_outputs(batch)
+        images, images_rev, states, labels, preds, embeddings = self.get_step_outputs(batch, generation_len)
 
         # Get model loss terms for the step
         likelihood, klz, dynamics_loss = self.get_step_losses(images, images_rev, preds)
@@ -180,6 +217,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         self.log("train_pixel_mse", self.reconstruction_loss(preds, images).mean([1, 2, 3]).mean(), prog_bar=True, on_step=True)
         self.log("train_dst", dst(images, preds.detach())[1], prog_bar=True, on_epoch=True, on_step=False)
         self.log("train_vpd", vpd(images, preds.detach())[1], prog_bar=True, on_epoch=True, on_step=False)
+        self.log("learning_rate", self.optimizers().param_groups[0]['lr'], prog_bar=False, on_step=True)
 
         # Determine KL annealing factor for the current step
         kl_factor = determine_annealing_factor(self.n_updates, anneal_update=1000)
@@ -229,7 +267,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         :param batch_idx: how far in the epoch this batch is
         """
         # Get model outputs from batch
-        images, images_rev, states, labels, preds, embeddings = self.get_step_outputs(batch)
+        images, images_rev, states, labels, preds, embeddings = self.get_step_outputs(batch, self.args.generation_len * 2)
 
         # Get model loss terms for the step
         likelihood, klz, dynamics_loss = self.get_step_losses(images, images_rev, preds)
@@ -271,7 +309,8 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         :param batch_idx: how far in the epoch this batch is
         """
         # Get model outputs from batch
-        images, images_rev, states, labels, preds, embeddings = self.get_step_outputs(batch)
+        # TODO - Output 50 runs per batch to get averaged metrics rather than one run
+        images, images_rev, states, labels, preds, embeddings = self.get_step_outputs(batch, self.args.generation_len)
         return {"states": states.detach(), "embeddings": embeddings.detach(),
                 "preds": preds.detach(), "images": images.detach()}
 
@@ -292,6 +331,12 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         images = torch.vstack(images)
         states = torch.vstack(states)
         embeddings = torch.vstack(embeddings)
+
+        # Only get metrics on unseen part in generation
+        preds = preds[:, self.args.training_len:]
+        images = images[:, self.args.training_len:]
+        states = states[:, self.args.training_len:]
+        embeddings = embeddings[:, self.args.training_len:]
 
         # Print statistics over the full set
         pixel_mse = self.reconstruction_loss(preds, images).detach().cpu().numpy()
@@ -339,6 +384,9 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
 
         # Save some examples
         show_images(images[:10], preds[:10], f"{output_path}/test_{self.args.dataset}_examples.png", num_out=5)
+
+        # Save trajectory examples
+        get_embedding_trajectories(embeddings[0], states[0], f"{output_path}/")
 
         # Save metrics to JSON in checkpoint folder
         with open(f"{output_path}/test_{self.args.dataset}_metrics.json", 'w') as f:

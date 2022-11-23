@@ -34,14 +34,14 @@ def show_images(images, preds, out_loc, num_out=None):
     for idx, (gt, pred) in enumerate(zip(images, preds)):
         # Pad between individual timesteps
         gt = np.pad(gt, pad_width=(
-            (0, 0), (5, 5), (0, 5)
+            (0, 0), (5, 5), (0, 1)
         ), constant_values=1)
 
         gt = np.hstack([i for i in gt])
 
         # Pad between individual timesteps
         pred = np.pad(pred, pad_width=(
-            (0, 0), (0, 10), (0, 5)
+            (0, 0), (0, 10), (0, 1)
         ), constant_values=1)
 
         # Stack timesteps into one image
@@ -58,3 +58,26 @@ def show_images(images, preds, out_loc, num_out=None):
 
     # Save to out location
     plt.imsave(out_loc, out_image, cmap='gray')
+
+
+def get_embedding_trajectories(embeddings, states, out_loc):
+    """
+    Handles getting trajectory plots of the embedded states against the true physical states
+    :param embeddings: vector states over time
+    :param states: ground truth physical parameter states
+    """
+    # Get embedding trajectory plots
+    for idx, embedding in enumerate(embeddings.permute([1, 0]).detach().cpu().numpy()):
+        plt.plot(embedding, label=f"Dim {idx}")
+
+    plt.title("Vector State Trajectories")
+    plt.savefig(f"{out_loc}/trajectories_embeddings.png")
+    plt.close()
+
+    # Get physical state trajectories
+    for idx, embedding in enumerate(states.permute([1, 0]).detach().cpu().numpy()):
+        plt.plot(embedding, label=f"Dim {idx}")
+
+    plt.title("GT State Trajectories")
+    plt.savefig(f"{out_loc}/trajectories_gt.png")
+    plt.close()

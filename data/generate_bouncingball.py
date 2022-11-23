@@ -94,7 +94,6 @@ class BallBox:
             self.space.add(sl)
 
         for s in range(sequences):
-
             if s % 100 == 0:
                 print(s)
 
@@ -128,25 +127,46 @@ if __name__ == '__main__':
 
     # Parameters of generation, resolution and number of samples
     scale = 1
-    train_size = 10000
-    test_size = 2000
+    train_size_generate = 2000
+    train_size_save = train_size_generate - 1000
+
+    test_size_generate = 3000
+    test_size_save = test_size_generate - 1000
+
+    base_dir = f"bouncing_ball/bouncingball_{train_size_save}samples_{200}steps/"
 
     # Arrays to hold sets
     train_images, train_states = [], []
     test_images, test_states = [], []
     np.random.seed(1234)
 
-    # Generate the first set
-    cannon = BallBox(dt=0.2, res=(32*scale, 32*scale), init_pos=(16*scale, 16*scale), init_std=8, wall=None, gravity=(0.0, 0.0), ball_color="white")
-    i, s = cannon.run(delay=None, iterations=65, sequences=train_size, radius=4, angle_limits=(0, 360), velocity_limits=(5.0, 10.0), save='npz')
+    # Generate the training/val set
+    cannon = BallBox(dt=0.5, res=(32*scale, 32*scale), init_pos=(16*scale, 16*scale), init_std=8, wall=None, gravity=(0.0, 0.0), ball_color="white")
+    i, s = cannon.run(delay=None, iterations=200, sequences=train_size_generate, radius=4, angle_limits=(0, 360), velocity_limits=(5.0, 10.0), save='npz')
+
+    rows = np.any(np.all(i.reshape([i.shape[0], i.shape[1], -1])) == 0, axis=0)
+    i = np.delete(i, rows, 0)
+    s = np.delete(s, rows, 0)
+    i = i[:train_size_save, :]
+    s = s[:train_size_save, :]
+
     i[i > 0] = 1
     i[i == 0] = 0.32
     train_images.append(i)
     train_classes = np.full([i.shape[0], 1], fill_value=2)
     train_states.append(s)
 
-    cannon = BallBox(dt=0.2, res=(32*scale, 32*scale), init_pos=(16*scale, 16*scale), init_std=8, wall=None, gravity=(0.0, 0.0), ball_color="white")
-    i, s = cannon.run(delay=None, iterations=65, sequences=test_size, radius=4, angle_limits=(0, 360), velocity_limits=(5.0, 10.0), save='npz')
+    # Generate the test set
+    cannon = BallBox(dt=0.5, res=(32*scale, 32*scale), init_pos=(16*scale, 16*scale), init_std=8, wall=None, gravity=(0.0, 0.0), ball_color="white")
+    i, s = cannon.run(delay=None, iterations=200, sequences=test_size_generate, radius=4, angle_limits=(0, 360), velocity_limits=(5.0, 10.0), save='npz')
+    if np.any(s[:, :, :2] < 0) or np.any(s[:, :, :2] > 32):
+        rows = np.union1d(np.unique(np.where(s[:, :, :2] < 0)[0]), np.unique(np.where(s[:, :, :2] > 32)[0]))
+        i = np.delete(i, rows, 0)
+        s = np.delete(s, rows, 0)
+        if i.shape[0] > test_size_save:
+            i = i[:test_size_save, :]
+            s = s[:test_size_save, :]
+
     i[i > 0] = 1
     i[i == 0] = 0.32
 
@@ -177,9 +197,10 @@ if __name__ == '__main__':
             image = np.clip(image + i * color, 0, color)
         return image
 
-    base_dir = "hamiltonian/bouncing_ball/bouncingball_10000samples_65steps/"
-
     # Make sure all directories are made beforehand
+    if not os.path.exists(f"{base_dir}/"):
+        os.mkdir(f"{base_dir}/")
+
     if not os.path.exists(f"{base_dir}/examples/"):
         os.mkdir(f"{base_dir}/examples/")
 

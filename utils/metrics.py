@@ -5,6 +5,9 @@ Holds a variety of metric computing functions for time-series forecasting models
 Valid Prediction Time (VPT), Valid Prediction Distance (VPD), etc.
 """
 import numpy as np
+import torch
+import torch.nn as nn
+
 from skimage.filters import threshold_otsu
 from sklearn.linear_model import LinearRegression
 from sklearn.neural_network import MLPRegressor
@@ -165,3 +168,17 @@ def r2fit(latents, gt_state, mlp=False):
 
     # Return r2s for logging
     return r2s
+
+
+def normalized_pixel_mse(gt, preds):
+    """
+    Handles getting the pixel MSE of a trajectory, but normalizes over the average intensity of the ground truth.
+    This helps to be able to compare pixel MSE effectively over different domains rather than looking at pure intensity.
+    :param gt: ground truth sequence [BS, TS, Dim1, Dim2]
+    :param preds: predictions of the model [BS, TS, Dim1, Dim2]
+
+    TODO: Make sure this metric calculation matches WhichPriorsMatter?
+    """
+    mse = nn.MSELoss(reduction='none')(gt, preds)
+    mse = mse / torch.mean(gt ** 2)
+    return mse.detach().cpu().numpy(), mse.mean([1, 2, 3]).mean().detach().cpu().numpy()

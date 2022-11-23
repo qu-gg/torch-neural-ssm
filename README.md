@@ -88,7 +88,7 @@ Given the fast pace of progress in latent dynamics modeling over recent years, m
 The PGM associated with each approach is determined by the latent variable chosen for inference.
 
 <a name="latentSchematic"></a>
-<p align='center'><img src="https://user-images.githubusercontent.com/32918812/172081773-d6af11d9-9c1e-4b04-8c65-a83e0fa80dbc.png" alt="latent variable schematic" /></p>
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/203471172-6dcbb898-d2fb-411f-b486-ed153b95bfc6.png" alt="latent variable schematic" /></p>
 <p align='center'>Fig 2. Schematic of latent variable PGMs in Neural SSMS<sup>[MetaLearning]</sup>.</p>
 
 

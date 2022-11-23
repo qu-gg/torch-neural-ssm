@@ -19,10 +19,10 @@ def parse_args():
     parser = argparse.ArgumentParser()
 
     # Experiment ID and Checkpoint to Load
-    parser.add_argument('--exptype', type=str, default='pendulum', help='experiment folder name')
-    parser.add_argument('--ckpt_path', type=str, default='experiments/pendulum/node/version_1/',
+    parser.add_argument('--exptype', type=str, default='node_pendulum_cosineannealing', help='experiment folder name')
+    parser.add_argument('--ckpt_path', type=str, default='experiments/node_pendulum_systemidentification/node/version_5/',
                         help='path to the checkpoints folder')
-    parser.add_argument('--checkpt', type=str, default='epoch31-val_pixel_mse0.0005.ckpt',
+    parser.add_argument('--checkpt', type=str, default='None',
                         help='name a specific checkpoint, will use the last one if none given')
     parser.add_argument('--dev', type=int, default=0, help='which gpu device to use')
 
@@ -34,8 +34,8 @@ def parse_args():
 
     # Dataset-to-use parameters
     parser.add_argument('--dataset', type=str, default='pendulum', help='dataset folder name')
-    parser.add_argument('--dataset_ver', type=str, default='pendulum_10000samples_200steps', help='dataset version')
-    parser.add_argument('--dataset_percent', type=float, default=1, help='how much of the dataset to use')
+    parser.add_argument('--dataset_ver', type=str, default='pendulum_12500samples_200steps_dt01', help='dataset version')
+    parser.add_argument('--dataset_percent', type=float, default=1.0, help='how much of the dataset to use')
 
     # Input dimensions
     parser.add_argument('--dim', type=int, default=32, help='dimension of the image data')
@@ -45,7 +45,8 @@ def parse_args():
     parser.add_argument('--z_amort', type=int, default=5, help='how many X samples to use in z0 inference')
 
     # Timesteps of generation
-    parser.add_argument('--generation_len', type=int, default=60, help='total length to generate')
+    parser.add_argument('--generation_len', type=int, default=90, help='total length to generate')
+    parser.add_argument('--training_len', type=int, default=1, help='total length to generate')
     return parser
 
 
@@ -73,7 +74,7 @@ if __name__ == '__main__':
         ckpt_path = arg.ckpt_path + "/checkpoints/" + arg.checkpt
     else:
         ckpt_path = f"{arg.ckpt_path}/checkpoints/{os.listdir(f'{arg.ckpt_path}/checkpoints/')[-1]}"
-    ckpt = torch.load(ckpt_path)
+    ckpt = torch.load(ckpt_path, map_location=f"cuda:{arg.gpus[0]}")
     print(ckpt_path)
 
     # Load in hyperparameter JSON and add to argparse NameSpace
