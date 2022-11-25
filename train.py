@@ -9,6 +9,7 @@ import pytorch_lightning
 
 from utils.dataloader import Dataset
 from distutils.util import strtobool
+from utils.utils import StoreDictKeyPair
 from utils.utils import get_exp_versions, get_model
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, LearningRateMonitor
 
@@ -27,6 +28,12 @@ def parse_args():
     parser.add_argument('--system_identification', type=bool, default=True,
                         help='whether to use (True) system identification or (False) state estimation model versions'
                              'note that some baselines ignore this parameter and are fixed')
+
+    # ODE Integration parameters
+    parser.add_argument('--integrator', type=str, default='rk4', help='which ODE integrator to use')
+    parser.add_argument('--integrator_params', dest="integrator_params",
+                        action=StoreDictKeyPair, default={'step_size': 0.125},
+                        help='ODE integrator options, set as --integrator_params key1=value1,key2=valeu2,...')
 
     # Dataset-to-use parameters
     parser.add_argument('--dataset', type=str, default='pendulum', help='dataset folder name')

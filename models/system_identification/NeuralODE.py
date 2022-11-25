@@ -57,10 +57,8 @@ class NeuralODE(LatentDynamicsModel):
 
         # Evaluate forward over timestep
         zt = odeint(self.dynamics_func, z_init, t,
-                    # method='dopri5', atol=1e-8, rtol=1e-7, options={'max_num_steps': 2000, 'dtype': torch.float32}
-                    method='rk4', options={'step_size': 0.125}
+                    method=self.args.integrator, options=dict(self.args.integrator_params)
                     )  # [T,q]
-
         zt = zt.permute([1, 0, 2])
 
         # Stack zt and decode zts

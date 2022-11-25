@@ -5,6 +5,7 @@ Utility functions across files
 """
 import os
 import math
+import argparse
 import torch.nn as nn
 
 from torch.optim.lr_scheduler import _LRScheduler
@@ -250,3 +251,21 @@ class CosineAnnealingWarmRestartsWithDecayAndLinearWarmup(_LRScheduler):
                 self.print_lr(self.verbose, i, lr, epoch)
 
         self._last_lr = [group['lr'] for group in self.optimizer.param_groups]
+
+
+class StoreDictKeyPair(argparse.Action):
+    """
+    Argparse custom action that builds a dictionary of values from a single parameters in the form of
+    --param key1=value1,key2=value2,...
+    """
+    def __call__(self, parser, namespace, values, option_string=None):
+        my_dict = {}
+        for kv in values.split(","):
+            k, v = kv.split("=")
+
+            # Quick check to see if the passed value is
+            try:
+                my_dict[k] = float(v)
+            except ValueError:
+                my_dict[k] = v
+        setattr(namespace, self.dest, my_dict)

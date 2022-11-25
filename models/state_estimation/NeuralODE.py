@@ -71,7 +71,9 @@ class NeuralODE(LatentDynamicsModel):
         prev_z = z_init
         for tidx in t:
             # Propagate forward one timestep with ODE
-            z_pred = odeint(self.ode_func, prev_z, torch.Tensor([0, 1]), method='rk4', options={'step_size': 0.5})[1]
+            z_pred = odeint(self.ode_func, prev_z, torch.Tensor([0, 1]),
+                            method=self.args.integrator, options=dict(self.args.integrator_params)
+                            )[1]
 
             # Encode observation at step
             z_obs = self.obs_encoder(x[:, int(tidx) - 1].unsqueeze(1))

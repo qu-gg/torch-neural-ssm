@@ -168,7 +168,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         :return: likelihood, kl on z0, model-specific dynamics loss
         """
         # Reconstruction loss for the sequence and z0
-        likelihood = self.reconstruction_loss(preds, images).sum([2, 3]).mean() # .mean([1]).mean([0])
+        likelihood = self.reconstruction_loss(preds, images).sum([2, 3]).flatten().mean()
 
         # Initial encoder loss, KL[q(z_K|x_0:K) || p(z_K)]
         klz = self.encoder.kl_z_term()

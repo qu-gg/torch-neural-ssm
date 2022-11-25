@@ -60,7 +60,9 @@ class BayesNeuralODE(LatentDynamicsModel):
         t = torch.linspace(0, generation_len - 1, generation_len).to(self.device)
 
         # Evaluate forward over timestep
-        zt = odeint(self.dynamics_func, z_init, t, method='rk4', options={'step_size': 0.125})  # [T,q]
+        zt = odeint(self.dynamics_func, z_init, t,
+                    method=self.args.integrator, options=dict(self.args.integrator_params)
+                    )  # [T,q]
         zt = zt.permute([1, 0, 2])
 
         # Stack zt and decode zts
