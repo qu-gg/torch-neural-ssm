@@ -73,9 +73,12 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
 
         By default, we assume a joint optim with the Adam Optimizer. We additionally include LR Warmup and
         CosineAnnealing with decay for standard learning rate care during training.
+
+        For CosineAnnealing, we set the LR bounds to be [LR * 1e-2, LR]
         """
         optim = torch.optim.AdamW(self.parameters(), lr=self.args.learning_rate)
-        scheduler = CosineAnnealingWarmRestartsWithDecayAndLinearWarmup(optim, T_0=3000, T_mult=1,
+        scheduler = CosineAnnealingWarmRestartsWithDecayAndLinearWarmup(optim, T_0=5000, T_mult=1,
+                                                                        eta_min=self.args.learning_rate * 1e-2,
                                                                         warmup_steps=600, decay=0.90)
 
         # Explicit dictionary to state how often to ping the scheduler
@@ -107,7 +110,8 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
             'z_amort': self.args.z_amort,
             'fix_variance': self.args.fix_variance,
             'system_identification': self.args.system_identification,
-            'number_params': pytorch_total_params
+            'learning_rate': self.args.learning_rate,
+            'number_params': pytorch_total_params,
         }
         with open(f"{self.version_path}/params.json", 'w') as f:
             json.dump(params, f)
@@ -262,9 +266,20 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         # Log validation likelihood and metrics
         self.log("val_likelihood", likelihood, prog_bar=True)
         self.log("val_vpt", vpt(images, preds.detach())[0], prog_bar=True, on_epoch=True, on_step=False)
-        self.log("val_pixel_mse", self.reconstruction_loss(preds, images).mean([1, 2, 3]).mean(), prog_bar=True, on_epoch=True, on_step=False)
         self.log("val_dst", dst(images, preds.detach())[1], prog_bar=True, on_epoch=True, on_step=False)
         self.log("val_vpd", vpd(images, preds.detach())[1], prog_bar=True, on_epoch=True, on_step=False)
+
+        # Get extrapolation metrics if validation generation is longer than training
+        if self.args.generation_validation_len > self.args.generation_len:
+            self.log("val_mse_recon", self.reconstruction_loss(preds[:, :self.args.generation_len],
+                                                               images[:, :self.args.generation_len]).mean([1, 2, 3]).mean(),
+                     prog_bar=True, on_epoch=True, on_step=False)
+            self.log("val_mse_extrapolation", self.reconstruction_loss(preds[:, self.args.generation_len:],
+                                                                       images[:, self.args.generation_len:]).mean([1, 2, 3]).mean(),
+                     prog_bar=True, on_epoch=True, on_step=False)
+        else:
+            self.log("val_mse_recon", self.reconstruction_loss(preds, images).mean([1, 2, 3]).mean(),
+                     prog_bar=True, on_epoch=True, on_step=False)
 
         # Build the full loss
         loss = likelihood + dynamics_loss
@@ -278,13 +293,9 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
 
     def validation_epoch_end(self, outputs):
         """
-        Every 4 epochs get a validation reconstruction sample
+        Every N epochs, get a validation reconstruction sample
         :param outputs: list of outputs from the validation steps at batch 0
         """
-        if self.current_epoch == 0:
-            return
-
-        # Show side-by-side reconstructions
         show_images(outputs[0]["images"], outputs[0]["preds"],
                     f'{self.version_path}/images/recon{self.current_epoch}val.png', num_out=5)
 
@@ -295,7 +306,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         :param batch_idx: how far in the epoch this batch is
         """
         # Get model outputs from batch
-        # TODO - Output 50 runs per batch to get averaged metrics rather than one run
+        # TODO - Output N runs per batch to get averaged metrics rather than one run
         images, images_rev, states, labels, preds, embeddings = self.get_step_outputs(batch, self.args.generation_len)
         return {"states": states.detach(), "embeddings": embeddings.detach(),
                 "preds": preds.detach(), "images": images.detach()}

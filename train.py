@@ -32,8 +32,8 @@ def parse_args():
     # ODE Integration parameters
     parser.add_argument('--integrator', type=str, default='rk4', help='which ODE integrator to use')
     parser.add_argument('--integrator_params', dest="integrator_params",
-                        action=StoreDictKeyPair, default={'step_size': 0.125},
-                        help='ODE integrator options, set as --integrator_params key1=value1,key2=valeu2,...')
+                        action=StoreDictKeyPair, default={'step_size': 0.5},
+                        help='ODE integrator options, set as --integrator_params key1=value1,key2=value2,...')
 
     # Dataset-to-use parameters
     parser.add_argument('--dataset', type=str, default='pendulum', help='dataset folder name')
@@ -44,7 +44,7 @@ def parse_args():
     # Learning parameters
     parser.add_argument('--num_epochs', type=int, default=249, help='number of epochs to run')
     parser.add_argument('--batch_size', type=int, default=32, help='size of batch')
-    parser.add_argument('--learning_rate', type=float, default=5e-4, help='initial learning rate')
+    parser.add_argument('--learning_rate', type=float, default=1e-3, help='initial learning rate')
 
     # Tuning parameters
     parser.add_argument('--z0_beta', type=float, default=0.01, help='multiplier for z0 term in loss')
@@ -66,7 +66,7 @@ def parse_args():
                         default=False, help='whether to fix variance in z0 encoding')
 
     # Timesteps to generate out
-    parser.add_argument('--generation_len', type=int, default=30, help='total length to generate (including z_amort)')
+    parser.add_argument('--generation_len', type=int, default=15, help='total length to generate (including z_amort)')
     parser.add_argument('--generation_varying', type=lambda x: bool(strtobool(x)),
                         default=True, help='whether to vary the generation_len/batch')
     parser.add_argument('--generation_validation_len', type=int, default=30, help='total length to generate for validation')
@@ -103,10 +103,10 @@ if __name__ == '__main__':
     model = model_type(arg, top, exptop)
 
     # Callbacks for checkpointing and early stopping
-    checkpoint_callback = ModelCheckpoint(monitor='val_pixel_mse',
-                                          filename='epoch{epoch:02d}-val_pixel_mse{val_pixel_mse:.4f}',
+    checkpoint_callback = ModelCheckpoint(monitor='val_mse_recon',
+                                          filename='epoch{epoch:02d}-val_mse_recon{val_mse_recon:.4f}',
                                           auto_insert_metric_name=False, save_last=True)
-    early_stop_callback = EarlyStopping(monitor="val_pixel_mse", min_delta=0.0005, patience=10, mode="min")
+    early_stop_callback = EarlyStopping(monitor="val_mse_recon", min_delta=0.0005, patience=10, mode="min")
     lr_monitor = LearningRateMonitor(logging_interval='step')
 
     # Initialize trainer
