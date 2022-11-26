@@ -127,7 +127,14 @@ Regardless of the precise assumptions, this framework builds a strong latent dyn
 <a name="initialState"></a>
 ## Latent Initial State Z<sub>0</sub> / Z<sub>init</sub>
 
-As the transition dynamics and the observation space are intentionally disconnected in this framework, the problem of inferring a strong initial latent state from which to forecast is an important consideration when designing a neural state-space model. This is primarily a task- and data-dependent choice, in which the architecture follows the data structure. Thankfully, much work has been done in other research directions on designing good latent encoding models. As such, works in this area often draw from them. This section is split into three parts - one on the usual architecture for high-dimensional image tasks, one on lower-dimensional and/or miscellaneous encoders, and one on the difference between <b>z</b><sub>0</sub> and <b>z</b><sub>init</sub>.
+As the transition dynamics and the observation space are intentionally disconnected in this framework, 
+the problem of inferring a strong initial latent state from which to forecast is an important consideration 
+when designing a neural state-space model. This is primarily a task- and data-dependent choice, 
+in which the architecture follows the data structure. Thankfully, much work has been done in other research 
+directions on designing good latent encoding models. As such, works in this area often draw from them. 
+This section is split into three parts - one on the usual architecture for high-dimensional image tasks, 
+one on lower-dimensional and/or miscellaneous encoders, and one on the different forms of inference for the initial
+state depending on which sequence portions are observed.
 
 <b>Image-based Encoders</b>: Unsurprisingly, the common architecture used in latent image encoding is a convolutional neural network (CNN) given its inherent bias toward spatial feature extraction<sup>[1,3,4,5]</sup>. Works are mixed between either having the sequential input reshaped as frames stacked over the channel dimension or simply running the CNN over each observed frame separately and passing the concatenated embedding into an output layer. Regardless of methodology, a few frames are assumed as observations for initialization, as multiple timesteps are required to infer the initial system movement. A subset of works considers second-order latent vector spaces, in which the encoder is explicitly split into two individual position and momenta functions, taking single and multiple frames respectively<sup>[5]</sup>.
 
@@ -143,14 +150,38 @@ As the transition dynamics and the observation space are intentionally disconnec
 <p align='center'>Fig N. Visualization of the stacked graph convolutional encoder, modified from [24].</p>
 
 
-<b>Variables <b>z</b><sub>0</sub> vs. <b>z</b><sub>init</sub></b>:
-Beyond just the inference of this latent variable, there is one more variation that can be seen throughout literature - that of whether the inferred variable is directly <b>z</b><sub>0</sub> or a pre-forecast variable <b>z</b><sub>init</sub>. For <b>z</b><sub>0</sub>, the initial latent state directly goes through the decoder for the initial reconstruction <b>x</b><sub>0</sub> without any interaction with the dynamics function. On the other hand, <b>z</b><sub>init</sub> represents an abstract initial vector state that the dynamics function starts from to get to <b>z</b><sub>0</sub> and <b>x</b><sub>0</sub>. It is a subtle distinction but potentially has implications for the resulting likelihood optimization and learned vector space. 
+<b>Variables <b>z</b><sub>0</sub>, <b>z</b><sub>k</sub></b>, and <b>z</b><sub>init</sub></b>:
+Beyond just the inference of this latent variable, there is one more variation that can be seen throughout literature -
+that of which portions of the input sequence are observed and used in the initial state inference. 
+
+Generally, there are 3 forms seen:
+<ul>
+<li><b>z</b><sub>0</sub> - which uses a sequence <b>x</b><sub>0:k</sub> to get <b>z</b><sub>0</sub>.</li>
+<li><b>z</b><sub>k</sub> - which uses previous frames <b>x</b><sub>-k:k</sub> to get <b>z</b><sub>k</sub> to go forward past observed frames.</li>
+<li><b>z</b><sub>init</sub> - which uses the sequence <b>x</b><sub>0:k</sub> to get an abstract initial vector state that the dynamics function starts from.</li>
+</ul>
+
+Throughout literature, these variable names as shown here aren't used (as most works just call it <b>z</b><sub>0</sub> 
+and describe its inference) but we differentiate it specifically to highlight the distinctions. 
+For training purspoes, it is a subtle distinction but potentially has implications for the resulting l
+ikelihood optimization and learned vector space. 
 
 <a name="z0vszinit"></a>
-<p align='center'><img src="https://user-images.githubusercontent.com/32918812/173461096-4b9611fc-6cb0-4b1c-820b-daa46b2335c1.png", width=500, alt="initial latent variable comparison" /></p>
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/204066391-09e3d29e-a0bd-47d6-bfee-f11c2b71fa93.png", width=500, alt="initial latent variable comparison" /></p>
 <p align='center'>Fig N. Schematic of the difference between <b>z</b><sub>0</sub> and <b>z</b><sub>init</sub></b> formulations.
 
-Saying that, however, there is not much work exploring the considerations for each approach, besides ad-hoc solutions to bridge the gap between the latent encoder and dynamics function distributions<sup>[5]</sup>. This gap can stem from optimization problems caused by imbalanced reconstruction terms between dynamics and initial states or in cases where the initial state distribution is far enough away from the data distribution of downstream frames. A variety of empirical techniques have been proposed to tackle this gap, much in the same spirit of empirical VAE stability 'tricks.' These include separated <b>x</b><sub>0</sub> and <b>x</b><sub>1:T</sub> terms (where <b>x</b><sub>0</sub> has a positive weighting coefficient), VAE pre-training for <b>x</b><sub>0</sub>, and KL-regularization terms between the output distributions of the encoder and the dynamics flow<sup>[1,5]</sup>. One <i>personal</i> intuition regarding these two variable approaches and the tricks applied is that there exists a theoretical trade-off between the two formulations and the tricks applied help to empirically alleviate the shortcomings of either approach. This, however, requires experimentation and validation before any claims can be made.
+Saying that, there is not much work exploring the considerations for each approach, besides ad-hoc solutions to bridge 
+the gap between the latent encoder and dynamics function distributions<sup>[5]</sup>. This gap can stem from 
+optimization problems caused by imbalanced reconstruction terms between dynamics and initial states or in cases 
+where the initial state distribution is far enough away from the data distribution of downstream frames. 
+
+A variety of empirical techniques have been proposed to tackle this gap, much in the same spirit of empirical 
+VAE stability 'tricks.' These include separated <b>x</b><sub>0</sub> and <b>x</b><sub>1:T</sub> terms 
+(where <b>x</b><sub>0</sub> has a positive weighting coefficient), VAE pre-training for <b>x</b><sub>0</sub>, 
+and KL-regularization terms between the output distributions of the encoder and the dynamics flow<sup>[1,5]</sup>. 
+One <i>personal</i> intuition regarding these two variable approaches and the tricks applied is that there exists 
+a theoretical trade-off between the two formulations and the tricks applied help to empirically alleviate the 
+shortcomings of either approach. This, however, requires experimentation and validation before any claims can be made.
 
 <!-- RECONSTRUCTION V EXTRAPOLATION -->
 <a name="reconstructionExtrapolation"></a>
@@ -159,7 +190,7 @@ Saying that, however, there is not much work exploring the considerations for ea
 There are three important phases during the forecasting for a neural SSM, that of initial state inference, reconstruction, 
 and extrapolation. 
 
-<p align='center'><img src="https://user-images.githubusercontent.com/32918812/194622841-e9dff96e-0594-4102-885b-4d866720e30a.png" alt="reconstruction vs extrapolation" /></p>
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/204066734-4b961b29-7e01-4335-bf94-9bb552daa3ce.png" alt="reconstruction vs extrapolation" /></p>
 <p align='center'>Fig N. Breakdown of the three forecasting phases - initial state inference, reconstruction, and extrapolation.</p>
 
 <b>Initial State Inference</b>: Inferring the initial state and how many frames are required to get a good
@@ -176,7 +207,7 @@ extrapolation ability of models on Hamiltonian systems.
 
 <b>Extrapolation</b>: This phase refers to the arbitrarily long forecasting of frames that goes beyond the length used
 in the likelihood term during training. It represents whether a model has captured the system dynamics sufficiently to
-enable long-term forecasting and model long-term energy decay, specifically in non-conserving systems. For specific 
+enable long-term forecasting or model energy decay in non-conserving systems. For specific 
 dynamical systems, this can be a difficult task as, at base, there is no training signal to inform the model to learn
 good extrapolation. Works often highlight metrics independently on reconstruction and extrapolation phases to highlight
 a model's strength of identification<sup>[4]</sup>.
@@ -208,31 +239,44 @@ robust against error accumulation that impacts long-horizon forecasting.
 <li>Use variable lengths of reconstruction during training, sampling 1-T frames to reconstruct in a given batch.</li>
 <li>If you have long sequences, especially in non-conserving systems, sample a random starting point per batch.</li>
 <li>Train for longer than you might expect, even when training metrics have converged for "reconstruction."</li>
+<li>The integrator choice can affect this, as non-symplectic integrators have known error accumulation which affects the vector state over long horizons<sup>[4]</sup></li>
 </ol>
 
 <!-- CONTROLS -->
 <a name="ssmControls"></a>
 ## Use of System Controls, u<sub>t</sub>
 
-Insofar we have ignored another common and important component of state-space modeling, the incorporation of external controls <i>u</i> that affect the transition function of the state. Controls represent factors that influence the trajectory of a system but are not direct features of the object/system being modeled. For example, an external force such as friction acting on a moving ball or medications given to a patient could be considered controls<sup>[8,14]</sup>. These allow an additional layer of interpretability in SSMs and even enable counterfactual reasoning; i.e., given the current state, what does its trajectory look like under varying control inputs going forwards? This has myriad uses in medical modeling with counterfactual medicine<sup>[14]</sup> or physical system simulations<sup>[8]</sup>.
+Insofar we have ignored another common and important component of state-space modeling, the incorporation of external 
+controls <i>u</i> that affect the transition function of the state. Controls represent factors that influence the 
+trajectory of a system but are not direct features of the object/system being modeled. For example, an external 
+force such as friction acting on a moving ball or medications given to a patient could be considered 
+controls<sup>[8,14]</sup>. These allow an additional layer of interpretability in SSMs and even enable counterfactual 
+reasoning; i.e., given the current state, what does its trajectory look like under varying control inputs going 
+forwards? This has myriad uses in medical modeling with counterfactual medicine<sup>[14]</sup> or physical system 
+simulations<sup>[8]</sup>.
 <p> </p>
 
 For Neural SSMs, a variety of approaches have been taken thus far depending on the type of latent transition function used.
 <p> </p>
 
-<b>Linear Dynamics</b>: In latent dynamics still parameterized by traditional linear gaussian transition functions, control incorporation is as easy as the addition of another transition matrix <b>B<sub>t</sub></b> that modifies a control input <b>u<sub>t</sub></b> at each timestep<sup>[1,2,4,7]</sup>.
+<b>Linear Dynamics</b>: In latent dynamics still parameterized by traditional linear gaussian transition functions, 
+control incorporation is as easy as the addition of another transition matrix <b>B<sub>t</sub></b> that modifies a 
+control input <b>u<sub>t</sub></b> at each timestep<sup>[1,2,4,7]</sup>.
 
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/170075684-2ba31e45-b66f-4d3c-aed6-9ab28def95d6.png" alt="linear control" /></p>
 <p align='center'>Fig N. Example of control input in a linear transition function<sup>[1]</sup>.</p>
 <p> </p>
 
-<b>Non-Linear Dynamics</b>: In discrete non-linear transition matrices using either multi-layer perceptrons or recurrent cells, these can be leveraged by either concatenating it to the input vector before the network forward pass or as a data transformation in the form of element-wise addition and a weighted combination<sup>[10]</sup>.
+<b>Non-Linear Dynamics</b>: In discrete non-linear transition matrices using either multi-layer perceptrons or 
+recurrent cells, these can be leveraged by either concatenating it to the input vector before the network forward 
+pass or as a data transformation in the form of element-wise addition and a weighted combination<sup>[10]</sup>.
 
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/170173582-a8158240-62d0-4b7e-8793-d1c796bc4a6c.png" alt="non-linear control" /></p>
 <p align='center'>Fig N. Example of control input in a non-linear transition function<sup>[1]</sup>.</p>
 <p> </p>
 
-<b>Continuous Dynamics</b>: For incorporation into continuous latent dynamics functions, finding the best approaches is an ongoing topic of interest. Thus far, the reigning approaches are:
+<b>Continuous Dynamics</b>: For incorporation into continuous latent dynamics functions, finding the best approaches 
+is an ongoing topic of interest. Thus far, the reigning approaches are:
 
 1. Directly jumping the vector field state with recurrent cells<sup>[18]</sup>
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/170078493-b7d10d50-d252-4258-bed7-f7c2ae1080b9.png" alt="jump control" /></p>
@@ -243,6 +287,10 @@ For Neural SSMs, a variety of approaches have been taken thus far depending on t
 3. Introducing another dynamics mechanism, continuous or otherwise (e.g. neural ODE or attention blocks), that is combined with the latent trajectory <b>z<sub>1:T</sub></b> into an auxiliary state <b>h<sub>1:T</sub></b><sup>[8,14,25]</sup>.
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/170077468-f183e75f-3ad0-450e-b402-6718087c9b9c.png" alt="continuous control" /></p>
 <p align='center'>Fig N. Visualization of the IMODE architecture, taken from [8].</p>
+
+<!-- ODE INTEGRATORs -->
+<!-- <a name="odeIntegrators"></a>
+## Choice of ODE Integrator -->
 
 <!-- META-LEARNING -->
 <!-- <a name="metaLearning"></a>
@@ -261,6 +309,8 @@ The project's folder structure is as follows:
   torchssm/
   │
   ├── train.py                      # Training entry point that takes in user args and handles boilerplate
+  ├── test.py                       # Testing script to get reconstructions and metrics on a testing set
+  ├── tune.py                       # Performs a hyperparameter search for a given dataset using Ray[Tune]
   ├── README.md                     # What you're reading right now :^)
   ├── requirements.txt              # Anaconda requirements file to enable easy setup
   |
@@ -284,6 +334,7 @@ The project's folder structure is as follows:
   │   └── state_estimation/
   │       └── ...                   # Specific State-Estimation dynamics functions
   ├── utils/
+  │   ├── dataloader.py             # WebDataset class to return the dataloaders used in train/val/testing
   │   ├── layers.py                 # PyTorch Modules that represent general network layers
   │   ├── metrics.py                # Metric functions for evaluation
   │   ├── plotting.py               # Plotting functions for visualizatin
@@ -304,58 +355,128 @@ It comes in the form of color image sequences of arbitrary length, coupled with 
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/171246437-0a1ef292-f90c-4fb7-beb3-82a5e74bb549.gif" alt="pendulum examples" /></p>
 <p align='center'>Fig N. Pendulum-Colors Examples.</p>
 
-For the base presented experiments of this dataset, we consider and evaluate grayscale versions of pendulum and mass-spring - which conveniently are just the sliced red channel of the original sets. Each set has <code>50000</code> training and <code>5000</code> testing trajectories sampled at <code>Δt = 0.05</code> intervals. Energy conservation is preserved without friction and we assume constant placement of focal points for simplicity. Note that the modification to color outputs in this framework is as simple as modifying the number of channels in the encoder and decoder.
+For the base presented experiments of this dataset, we consider and evaluate grayscale versions of pendulum and 
+mass-spring - which conveniently are just the sliced red channel of the original sets. Each set has <code>50000</code> 
+training and <code>5000</code> testing trajectories sampled at <code>Δt = 1</code> time intervals. Energy conservation 
+is preserved without friction and we assume constant placement of focal points for simplicity. Note that the 
+modification to color outputs in this framework is as simple as modifying the number of channels in the 
+encoder and decoder.
 
 <p> </p>
-<b>Bouncing Balls</b>: Additionally, we provide a dataloader and generation scripts for the standard latent dynamics dataset of bouncing balls<sup>[1,2,5,7,8]</sup>, modified from the implementation in <a href="https://github.com/simonkamronn/kvae/tree/master/kvae/datasets">[1]</a>. It consists of a ball or multiple balls moving within a bounding box while being affected by potential external effects, e.g. gravitational forces<sup>[1,2,5]</sup>, pong<sup>[2]</sup>, and interventions<sup>[8]</sup>. The starting position, angle, and velocity of the ball(s) are sampled uniformly between a set range. It is generated with the <a href="https://github.com/viblo/pymunk">PyMunk</a> and <a href="https://www.pygame.org/news">PyGame</a> libraries. In this repository, we consider two sets - a simple set of one gravitational force and a mixed set of 4 gravitational forces in the cardinal directions with varying strengths. We similarly generate <code>50000</code> training and <code>5000</code> testing trajectories, however sample them at <code>Δt = 0.1</code> intervals.
+<b>Bouncing Balls</b>: Additionally, we provide a dataloader and generation scripts for the standard latent dynamics 
+dataset of bouncing balls<sup>[1,2,5,7,8]</sup>, modified from the implementation in 
+<a href="https://github.com/simonkamronn/kvae/tree/master/kvae/datasets">[1]</a>. It consists of a ball or multiple 
+balls moving within a bounding box while being affected by potential external effects, e.g. gravitational 
+forces<sup>[1,2,5]</sup>, pong<sup>[2]</sup>, and interventions<sup>[8]</sup>. The starting position, angle, 
+and velocity of the ball(s) are sampled uniformly between a set range. It is generated with the 
+<a href="https://github.com/viblo/pymunk">PyMunk</a> and <a href="https://www.pygame.org/news">PyGame</a> libraries. 
+In this repository, we consider two sets - a simple set of one gravitational force and a mixed set of 4 gravitational 
+forces in the cardinal directions with varying strengths. We similarly generate <code>50000</code> training and 
+<code>5000</code> testing trajectories, however sample them at <code>Δt = 0.1</code> intervals.
 
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/171948373-ad692ecc-bfac-49dd-86c4-137a2a5e4b73.gif" alt="bouncing ball examples" /></p>
 <p align='center'>Fig N. Single Gravity Bouncing  Ball Example.</p>
 
 <p> </p>
-Notably, this system is surprisingly difficult to successfully perform long-term generation on, especially in cases of mixed gravities or multiple objects. Most works only report on generation within 5-15 timesteps following a period of 3-5 observation timesteps<sup>[1,2,7]</sup> and farther timesteps show lost trajectories and/or incoherent reconstructions.
+Notably, this system is surprisingly difficult to successfully perform long-term generation on, especially in cases 
+of mixed gravities or multiple objects. Most works only report on generation within 5-15 timesteps following a 
+period of 3-5 observation timesteps<sup>[1,2,7]</sup> and farther timesteps show lost trajectories and/or 
+incoherent reconstructions.
 
 <p> </p>
-<b>Meta-Learning Datasets</b>: One of the latest research directions for neural SSMs is evaluating the potential of meta-learning to build
-domain-adaptable latent dynamics functions<sup>[26,27,29]</sup>. A representative dataset example for this task is the
-Turbulent Flow dataset that is affected by various buoyancy forces, highlighting a task with partially shared yet heterogeneous
-dynamics<sup>[27]</sup>.  
+<b>Meta-Learning Datasets</b>: One of the latest research directions for neural SSMs is evaluating the potential of 
+meta-learning to build domain-adaptable latent dynamics functions<sup>[26,27,29]</sup>. A representative dataset 
+example for this task is the Turbulent Flow dataset that is affected by various buoyancy forces, highlighting a 
+task with partially shared yet heterogeneous dynamics<sup>[27]</sup>.  
 
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/194636941-dc86e2a4-fd42-4121-94a2-19fdcb7f79f1.png" alt="turbulent flow examples" height="50%" width="50%" /></p>
 <p align='center'>Fig N. Turbulent Flow Example, sourced from [27].</p>
 
 <p> </p>
-<b>Multi-System Dynamics</b>: So far in the literature, the majority of works only consider training Neural SSMs on one system of dynamics at a time - with the most variety lying in that of differing trajectory hyper-parameters. The ability to infer multiple dynamical systems under one model (or learn to output dynamical functions given system observations) and leverage similarities between the sets is an ongoing research pursuit - with applications of neural unit hypernetworks<sup>[27]</sup> and dynamics functions conditioned on sequences via meta-learning<sup>[26,29]</sup> being the first dives into this.
+<b>Multi-System Dynamics</b>: So far in the literature, the majority of works only consider training Neural SSMs on 
+one system of dynamics at a time - with the most variety lying in that of differing trajectory hyper-parameters. 
+The ability to infer multiple dynamical systems under one model (or learn to output dynamical functions given 
+system observations) and leverage similarities between the sets is an ongoing research pursuit - with applications 
+of neural unit hypernetworks<sup>[27]</sup> and dynamics functions conditioned on sequences via 
+meta-learning<sup>[26,29]</sup> being the first dives into this.
 
 <p> </p>
-<b>Other Sets in Literature</b>: Outside of the previous sets, there are a plethora of other datasets that have been explored in relevant work. The popular task of human motion prediction in both the pose estimation and video generation setting has been considered via datasets <a href="http://vision.imar.ro/human3.6m/pami-h36m.pdf">Human3.6Mil</a>, <a href="http://mocap.cs.cmu.edu/">CMU Mocap</a>, and <a href="https://www.wisdom.weizmann.ac.il/~vision/SpaceTimeActions.html">Weizzman-Action</a><sup>[5,19]</sup>, though proper experimentation into this area would require problem-specific architectures given the depth of the existing field. Past high-dimensionality and image-space, standard benchmark datasets in time-series forecasting have also been considered, including the <a href="https://github.com/Mcompetitions/M4-methods">M4</a>, <a href="https://github.com/zhouhaoyi/ETDataset">Electricity Transformer Temperature (ETT)</a>, and <a href="https://www.nasa.gov/intelligent-systems-division">the NASA Turbofan Degradation</a> set. Recent works have begun looking at medical applications in inverse image reconstruction and the incorporation of physics-inspired priors<sup>[20,29y ]</sup>. Regardless of the success of Neural SSMs on these tasks, the task-agnostic factor and principled structure of this framework make it a versatile and appealing option for generative time-series modeling.
+<b>Other Sets in Literature</b>: Outside of the previous sets, there are a plethora of other datasets that have been 
+explored in relevant work. The popular task of human motion prediction in both the pose estimation and video 
+generation setting has been considered via datasets 
+<a href="http://vision.imar.ro/human3.6m/pami-h36m.pdf">Human3.6Mil</a>, 
+<a href="http://mocap.cs.cmu.edu/">CMU Mocap</a>, and 
+<a href="https://www.wisdom.weizmann.ac.il/~vision/SpaceTimeActions.html">Weizzman-Action</a><sup>[5,19]</sup>, 
+though proper experimentation into this area would require problem-specific architectures given the depth of the 
+existing field. Past high-dimensionality and image-space, standard benchmark datasets in time-series forecasting 
+have also been considered, including the <a href="https://github.com/Mcompetitions/M4-methods">M4</a>, 
+<a href="https://github.com/zhouhaoyi/ETDataset">Electricity Transformer Temperature (ETT)</a>, and 
+<a href="https://www.nasa.gov/intelligent-systems-division">the NASA Turbofan Degradation</a> set. 
+Recent works have begun looking at medical applications in inverse image reconstruction and the incorporation of 
+physics-inspired priors<sup>[20,29y ]</sup>. Regardless of the success of Neural SSMs on these tasks, the task-agnostic 
+factor and principled structure of this framework make it a versatile and appealing option for generative time-series modeling.
 
 
 <!-- MODELS -->
 <a name="models"></a>    
 ## Models
 
-Here, details on how the model implementation is structured and running experiments locally are given. As well, an overview of the abstract class implementation for a general Neural SSM and its types are explained.
+Here, details on how the model implementation is structured and running experiments locally are given. As well, 
+an overview of the abstract class implementation for a general Neural SSM and its types are explained.
 
 ### Implementation Structure
-Provided within this repository is a PyTorch class structure in which an abstract PyTorch-Lightning Module is shared across all the given models, from which the specific VAE and dynamics functions inherit and override the relevant forward functions for training and evaluation. Swapping between dynamics functions and PGM type is as easy as passing in the model's name for arguments, e.g. `python3 train.py --model node`. As the implementation is provided in <a href="https://pytorch-lightning.readthedocs.io/en/latest/">PyTorch-Lightning</a>, an optimization and boilerplate library for PyTorch, it is recommended to be familiar at face-level.
+Provided within this repository is a PyTorch class structure in which an abstract PyTorch-Lightning Module is shared 
+across all the given models, from which the specific VAE and dynamics functions inherit and override the relevant 
+forward functions for training and evaluation. Swapping between dynamics functions and PGM type is as easy as passing 
+in the model's name for arguments, e.g. `python3 train.py --model node`. As the implementation is provided in 
+<a href="https://pytorch-lightning.readthedocs.io/en/latest/">PyTorch-Lightning</a>, an optimization and boilerplate 
+library for PyTorch, it is recommended to be familiar at face-level.
 
 <p> </p>
-For every model run, a new lightning_logs/ version folder is created as well as a new experiment version under `experiments` related to the passed in naming arguments. Hyperparameters passed in for this run are both stored in the Tensorboard instance created as well as in the local file <code>hparams.yaml</code>. Default values and available options can be found in <code>utils/utils.py</code> or by running <code>python3 train.py -h</code>. During training and validation sequences, all of the metrics below are automatically tracked and saved into a Tensorboard instance which can be used to compare different model runs following. Every 5 epochs, reconstruction sequences against the ground truth for a set of samples are saved to the experiments folder. Currently, only one checkpoint is saved based on the last epoch ran rather than checkpoints based on the best validation score or at set epochs. Restarting training from a checkpoint or loading in a model for testing is done currently by the <code>lightning_logs/</code> ID, e.g. <code>python3 train.py --ckpt 51</code>.
+For every model run, a new <code>lightning_logs/</code> version folder is created as well as a new experiment version 
+under `experiments` related to the passed in naming arguments. Hyperparameters passed in for this run are both stored in 
+the Tensorboard instance created as well as in the local files <code>hparams.yaml, config.json</code>. Default values and available 
+options can be found in <code>train.py</code> or by running <code>python3 train.py -h</code>. During training 
+and validation sequences, all of the metrics below are automatically tracked and saved into a Tensorboard instance 
+which can be used to compare different model runs following. Every 5 epochs, reconstruction sequences against the 
+ground truth for a set of samples are saved to the experiments folder. Currently, only one checkpoint is saved based 
+on the last epoch ran rather than checkpoints based on the best validation score or at set epochs. Restarting training 
+from a checkpoint or loading in a model for testing is done currently by specifying the <code>ckpt_path</code> to the 
+base experiment folder and the <code>checkpt</code> filename.
 
 <p> </p>
-The implemented dynamics functions are each separated into their respective PGM groups, however, they can still share the same general classes. Each dynamics subclass has a <code>model_specific_loss</code> function that allows it to return additional loss values without interrupting the abstract flow. For example, this could be used in a flow-based prior that has additional KL terms over ODE flow density without needing to override the <code>training_step</code> function with a duplicate copy.
+The implemented dynamics functions are each separated into their respective PGM groups, however, they can still share 
+the same general classes. Each dynamics subclass has a <code>model_specific_loss</code> function that allows it to 
+return additional loss values without interrupting the abstract flow. For example, this could be used in a flow-based 
+prior that has additional KL terms over ODE flow density without needing to override the <code>training_step</code> 
+function with a duplicate copy. As well, there is additionally <code>model_specific_plotting</code> to enable custom 
+plots every training epoch end.
 
 ### Implemented Dynamics
 
 <b>System Identification Models</b>: 
 
 <p> </p>
-For the system identification models, we provide a variety of dynamics functions that resemble the general and special cases detailed above, which are provided in Fig N. below. The most general version is that of the Bayesian Neural ODE, in which a neural ordinary differential equation<sup>[21]</sup> is sampled from a set of optimized distributional parameters and used as the latent dynamics function <code>z<sup>'</sup><sub>t</sub> = f<sub><i>p</i>(θ)</sub>(z<sub>s</sub>)</code><sup>[5]</sup>. A deterministic version of a standard Neural ODE is similarly provided, e.g. <code>z<sup>'</sup><sub>t</sub> = f<sub>θ</sub>(z<sub>s</sub>)</code><sup>[10,21]</sup>. Following that, two forms of a Recurrent Generative Network are provided, a residual version (RGN-Res) and a full-step version (RGN), that represent deterministic and discrete non-linear transition functions. RGN-Res is the equivalent of a Neural ODE using a fixed step Euler integrator while RGN is just a recurrent forward step function. 
-Additionally, a representation of the time-varying Linear-Gaussian SSM transition dynamics<sup>[1,2]</sup> (LGSSM) is provided. And finally, a set of autoregressive models are considered (i.e. Recurrent neural networks, Long-Short Term Memory networks, Gated Recurrent Unit networks) as baselines. Their PyTorch Cell implementations are used and evaluated over the entire sequence, passing in the previously predicted state and observation as its inputs.
+For the system identification models, we provide a variety of dynamics functions that resemble the general and special 
+cases detailed above, which are provided in Fig N. below. The most general version is that of the Bayesian Neural ODE, 
+in which a neural ordinary differential equation<sup>[21]</sup> is sampled from a set of optimized distributional 
+parameters and used as the latent dynamics function 
+<code>z<sup>'</sup><sub>t</sub> = f<sub><i>p</i>(θ)</sub>(z<sub>s</sub>)</code><sup>[5]</sup>. A deterministic version 
+of a standard Neural ODE is similarly provided, e.g. 
+<code>z<sup>'</sup><sub>t</sub> = f<sub>θ</sub>(z<sub>s</sub>)</code><sup>[10,21]</sup>. Following that, two forms of a 
+Recurrent Generative Network are provided, a residual version (RGN-Res) and a full-step version (RGN), that represent 
+deterministic and discrete non-linear transition functions. RGN-Res is the equivalent of a Neural ODE using a fixed 
+step Euler integrator while RGN is just a recurrent forward step function. 
+Additionally, a representation of the time-varying Linear-Gaussian SSM transition dynamics<sup>[1,2]</sup> (LGSSM) is 
+provided. And finally, a set of autoregressive models are considered (i.e. Recurrent neural networks, Long-Short Term 
+Memory networks, Gated Recurrent Unit networks) as baselines. Their PyTorch Cell implementations are used and evaluated 
+over the entire sequence, passing in the previously predicted state and observation as its inputs.
 
 <p> </p>
-Training for these models has one mode, that of taking in several observational frames to infer <b>z</b><sub>0</sub> and  then outputting a full sequence autonomously without access to subsequent observations. A likelihood function is compared over the full reconstructed sequence and optimized over. Testing and generation in this setting can be done out to any horizon easily and we provide small sample datasets of <code>1000</code> timesteps to evaluate out to long horizons.
+Training for these models has one mode, that of taking in several observational frames to infer <b>z</b><sub>0</sub> 
+and  then outputting a full sequence autonomously without access to subsequent observations. A likelihood function is 
+compared over the full reconstructed sequence and optimized over. Testing and generation in this setting can be done 
+out to any horizon easily and we provide small sample datasets of <code>200</code> timesteps to evaluate out to long horizons.
 
 <p> </p>
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/172108058-481009a0-41c9-449e-bc0f-7b7a45ecefe0.png", height=400, alt="sysID models" /></p>
@@ -364,7 +485,17 @@ Training for these models has one mode, that of taking in several observational 
 <b>State Estimation Models</b>: 
 
 <p> </p>
-For the state estimation line, we provide a reimplementation of the classic Neural SSM work Deep Kalman Filter<sup>[7]</sup> alongside state estimation versions of the above, provided in Fig. N below. The DKF model modifies the standard Kalman Filter Gaussian transition function to incorporate non-linearity and expressivity by parameterizing the distribution parameters with neural networks <code>z<sub>t</sub>∼<i>N</i>(G(z<sub>t−1</sub>,∆<sub>t</sub>), S(z<sub>t−1</sub>,∆<sub>t</sub>))</code><sup>[7]</sup>. The autoregressive versions for this setting can be viewed as a reimplementation of the Variational Recurrent Neural Network (VRNN), one of the starting state estimation works in Neural SSMs<sup>[22]</sup>. For the latent correction step, we leverage a standard Gated Recurrent Unit (GRU) cell and the corrected latent state is what is passed to the decoder and likelihood function. Notably, there are two settings these models can be run under: <i>reconstruction</i> and <i>generation</i>. <i>Reconstruction</i> is used for training and incorporates ground truth observations to correct the latent state while <i>generation</i> is used to test the forecasting abilities of the model, both short- and long-term.
+For the state estimation line, we provide a reimplementation of the classic Neural SSM work Deep Kalman 
+Filter<sup>[7]</sup> alongside state estimation versions of the above, provided in Fig. N below. The DKF model modifies
+the standard Kalman Filter Gaussian transition function to incorporate non-linearity and expressivity by parameterizing 
+the distribution parameters with neural networks 
+<code>z<sub>t</sub>∼<i>N</i>(G(z<sub>t−1</sub>,∆<sub>t</sub>), S(z<sub>t−1</sub>,∆<sub>t</sub>))</code><sup>[7]</sup>. 
+The autoregressive versions for this setting can be viewed as a reimplementation of the Variational Recurrent Neural 
+Network (VRNN), one of the starting state estimation works in Neural SSMs<sup>[22]</sup>. For the latent correction 
+step, we leverage a standard Gated Recurrent Unit (GRU) cell and the corrected latent state is what is passed to the
+decoder and likelihood function. Notably, there are two settings these models can be run under: <i>reconstruction</i>
+and <i>generation</i>. <i>Reconstruction</i> is used for training and incorporates ground truth observations to correct 
+the latent state while <i>generation</i> is used to test the forecasting abilities of the model, both short- and long-term.
 
 <p> </p>
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/172186199-602a868b-77e4-44a2-b88d-64124c43afb9.png", height=400, alt="stateEst models" /></p>
@@ -410,15 +541,25 @@ Ref. [1], while containing linear transition dynamics, mentioned the possibility
 <a name="experiments"></a>
 # Experiments
 
-This section details some experiments that evaluate the fundamental aspects of Neural SSMs and the effects of the framework decisions one can take. Trained model checkpoints and hyperparameter files are provided for each experiment under ```experiments/model```. Evaluations are done with the metrics discussed above, as well as visualizations of animated trajectories over time and latent walk visualizations.
+This section details some experiments that evaluate the fundamental aspects of Neural SSMs and the effects of the 
+framework decisions one can take. Trained model checkpoints and hyperparameter files are provided for each experiment
+under <code>experiments/model</code>. Evaluations are done with the metrics discussed above, as well as visualizations of 
+animated trajectories over time and latent walk visualizations.
 
 <!-- HYPERPARAMETER TUNING -->
 <a name="hyperparameters"></a>
 ## Hyperparameter Tuning
 
-As is common in deep learning and variational inference tasks, the specific choices of hyper-parameters can have a significant impact on the resulting performance and generalization of the model. As such, first we perform a hyper-parameter tuning task for each model on a shared validation set to get eachs' optimized hyper-parameter set. From this, the optimal set for each is carried across the various tasks given similar task complexity. 
+As is common in deep learning and variational inference tasks, the specific choices of hyper-parameters can have a 
+significant impact on the resulting performance and generalization of the model. As such, first we perform a
+hyper-parameter tuning task for each model on a shared validation set to get eachs' optimized hyper-parameter set.
+From this, the optimal set for each is carried across the various tasks given similar task complexity. 
 
-We provide a Ray[Tune] tuning script to handle training and formatting the Pytorch-Lightning outputs for each model, found in <code>tune.py</code>. It automatically parallelizes across GPUs and has a convenient Tensorboard output interface to compare the tuning runs. We tune <code>50</code> configurations for each and use the unscaled validation likelihood as the metric of comparison. In order to run custom tuning tasks, simply create a local folder in the repository root directory and rename the tune run "name" to redirect the output there. Please refer to RayTune's relevant <a href="https://docs.ray.io/en/latest/tune/examples/tune-pytorch-lightning.html">documentation</a> for information.
+We provide a Ray[Tune] tuning script to handle training and formatting the Pytorch-Lightning outputs for each model, 
+found in <code>tune.py</code>. It automatically parallelizes across GPUs and has a convenient Tensorboard output 
+interface to compare the tuning runs. In order to run custom tuning tasks, simply create a local folder in the 
+repository root directory and rename the tune run "name" to redirect the output there. Please refer to RayTune's
+relevant <a href="https://docs.ray.io/en/latest/tune/examples/tune-pytorch-lightning.html">documentation</a> for information.
 
 <!-- HAMILTONIAN -->
 <a name="hamiltonian"></a>
@@ -428,7 +569,8 @@ We provide a Ray[Tune] tuning script to handle training and formatting the Pytor
 <a name="misc"></a>
 # Miscellaneous
 
-This section just consists of to-do's within the repo, contribution guidelines, and a section on how to find the references used throughout the repo.
+This section just consists of to-do's within the repo, contribution guidelines, 
+and a section on how to find the references used throughout the repo.
 
 <!-- TO-DO -->
 <a name="todo"></a>
@@ -452,11 +594,15 @@ This section just consists of to-do's within the repo, contribution guidelines, 
 
 - Add guidelines for an ```Experiment``` section highlighting experiments performed in validating the models
 - Add a section explaining for ```Meta-Learning``` works in Neural SSMs
+- Add a section explaining for ```ODE Integrator``` considerations in Neural SSMs
 
 <!-- CONTRIBUTIONS -->
 <a name="contributions"></a>
 ## Contributions
-Contributions are welcome and encouraged! If you have an implementation of a latent dynamics function you think would be relevant and add to the conversation, feel free to submit an Issue or PR and we can discuss its incorporation. Similarly, if you feel an area of the README is lacking or contains errors, please put up a README editing PR with your suggested updates. Even tackling items on the To-Do would be massively helpful!
+Contributions are welcome and encouraged! If you have an implementation of a latent dynamics function you think 
+would be relevant and add to the conversation, feel free to submit an Issue or PR and we can discuss its 
+incorporation. Similarly, if you feel an area of the README is lacking or contains errors, please put up a 
+README editing PR with your suggested updates. Even tackling items on the To-Do would be massively helpful!
 
 <!-- REFERENCES  -->
 <a name="references"></a>
