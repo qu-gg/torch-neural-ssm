@@ -40,7 +40,7 @@ If you found the information helpful for your work or use portions of this repo 
   - [Preliminaries](#prelims)
   - [What are Neural SSMs?](#neuralSSMwhat)
   - [Choice of SSM PGM](#pgmChoice)
-  - [Latent Initial State Z<sub>0</sub> / Z<sub>init</sub>](#initialState)
+  - [Latent Initial State Z<sub>0</sub> / Z<sub>k</sub> / Z<sub>init</sub>](#initialState)
   - [Reconstruction vs. Extrapolation](#reconstructionExtrapolation)
   - [System Controls, u<sub>t</sub>](#ssmControls)
 - [Implementation](#implementation)
@@ -92,36 +92,75 @@ The PGM associated with each approach is determined by the latent variable chose
 <p align='center'>Fig 2. Schematic of latent variable PGMs in Neural SSMS<sup>[MetaLearning]</sup>.</p>
 
 
-<b>System states as latent variables (State Estimation)</b>: The intuitive choice for the latent variable is the latent state <b>z_k</b> that underlies <b>x_k</b>, given that it is already latent in the system and is directly associated with the observations. The PGM of this form is shown under Fig. [1A](#pgmSchematic) where its marginal likelihood over an observed sequence x<sub>0:T</sub> is written as:
+<b>System states as latent variables (State Estimation)</b>: The intuitive choice for the latent variable is the 
+latent state <b>z_k</b> that underlies <b>x_k</b>, given that it is already latent in the system and is directly 
+associated with the observations. The PGM of this form is shown under Fig. [1A](#pgmSchematic) where its marginal 
+likelihood over an observed sequence x<sub>0:T</sub> is written as:
 
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/172077627-bc72445e-11d9-4344-86fc-0abbd0c723df.png" alt="state likelihood" /></p>
 
-where <i>p</i>(<b>x</b><sub>i</sub> | <b>z</b><sub>i</sub>) describes the emission model and <i>p</i>(<b>z</b><sub>i</sub> | <b>z</b><sub><i</sub>, <b>x</b><sub><u><</u>i</sub>) describes the latent dynamics function. Given the common intractability of the posterior, parameter inference is performed through a variational approximation of the posterior density <i>q</i>(<b>z</b><sub>0:T</sub> | <b>x</b><sub>0:T</sub>), expressed as:
+where <i>p</i>(<b>x</b><sub>i</sub> | <b>z</b><sub>i</sub>) describes the emission model and 
+<i>p</i>(<b>z</b><sub>i</sub> | <b>z</b><sub><i</sub>, <b>x</b><sub><u><</u>i</sub>) describes the latent dynamics 
+function. Given the common intractability of the posterior, parameter inference is performed through a variational 
+approximation of the posterior density <i>q</i>(<b>z</b><sub>0:T</sub> | <b>x</b><sub>0:T</sub>), expressed as:
 
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/172077640-16e26f56-bed3-4dec-b078-783e247eeda3.png" alt="state variational posterior" /></p>
 
-Given these two components, the standard training objective of the Evidence Lower Bound Objective (ELBO) is thus derived with the form:
+Given these two components, the standard training objective of the Evidence Lower Bound Objective (ELBO) is thus 
+derived with the form:
 
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/172077692-452892fc-e5e6-4f4a-9296-e975130da816.png" alt="state ELBO" /></p>
 
-where the first term represents a reconstruction likelihood term over the sequence and the second is a Kullback-Leibler divergence loss between the variational posterior approximation and some assumed prior of the latent dynamics. This prior can come in many forms, either being the standard Gaussian Normal in variational inference, flow-based priors from ODE settings<sup>[5]</sup>, or physics-based priors in problem-specific situations<sup>[20]</sup>. This is the primary design choice that separates current works in this area, specifically the modeling of the dynamics prior and its learned approximation. Many works draw inspiration for modeling this interaction by filtering techniques in standard SSMs, where a divergence term is constructed between the dynamics-predicted latent state and the data-corrected observation<sup>[7,18]</sup>.
+where the first term represents a reconstruction likelihood term over the sequence and the second is a Kullback-Leibler 
+divergence loss between the variational posterior approximation and some assumed prior of the latent dynamics. This 
+prior can come in many forms, either being the standard Gaussian Normal in variational inference, flow-based priors 
+from ODE settings<sup>[5]</sup>, or physics-based priors in problem-specific situations<sup>[20]</sup>. This is 
+the primary design choice that separates current works in this area, specifically the modeling of the dynamics prior 
+and its learned approximation. Many works draw inspiration for modeling this interaction by filtering techniques 
+in standard SSMs, where a divergence term is constructed between the dynamics-predicted latent state and the 
+data-corrected observation<sup>[7,18]</sup>.
 
-With this formulation, it is easy to see how dynamics models of this type can have a strong reconstructive capacity for the high-dimensional outputs and contain strong short-term predictions. In addition, input-influenced dynamics are inherent to the prediction task, as errors in the predictions of the latent dynamics are corrected by true observations every step. However, given this data-based correction, the resulting inference of <i>q</i>(<b>z</b><sub>i</sub> | <b>z</b><sub><i</sub>, <b>x</b><sub><u><</u>i</sub>) is weakened, and without near-term observations to guide the dynamics function, its long-horizon forecasting is limited<sup>[1,3]</sup>.
+With this formulation, it is easy to see how dynamics models of this type can have a strong reconstructive capacity for 
+the high-dimensional outputs and contain strong short-term predictions. In addition, input-influenced dynamics are 
+inherent to the prediction task, as errors in the predictions of the latent dynamics are corrected by true observations 
+every step. However, given this data-based correction, the resulting inference of 
+<i>q</i>(<b>z</b><sub>i</sub> | <b>z</b><sub><i</sub>, <b>x</b><sub><u><</u>i</sub>) is weakened, and without 
+near-term observations to guide the dynamics function, its long-horizon forecasting is limited<sup>[1,3]</sup>.
 
-<b>System parameters as latent variables (System Identification)</b>: Rather than system states, one can instead choose to select the parameters (denoted as <b>θ</b><sub>z</sub> in Equation [1](#ssmEQ)). With this change, the resulting PGM is represented in Fig. [1B](#pgmSchematic) and its marginal likelihood over x<sub>0:T</sub> is represented now by:
+<b>System parameters as latent variables (System Identification)</b>: Rather than system states, one can instead choose
+to select the parameters (denoted as <b>θ</b><sub>z</sub> in Equation [1](#ssmEQ)). With this change, the resulting PGM 
+is represented in Fig. [1B](#pgmSchematic) and its marginal likelihood over x<sub>0:T</sub> is represented now by:
 
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/172077614-52b7ff61-24f6-4828-8714-a73b57628e41.png" alt="sysID likelihood" /></p>
 
-where the resulting output observations are derived from an initial latent state <b>z</b><sub>0</sub> and the dynamics parameters <b>θ</b><sub>z</sub>. As before, a variational approximation is considered for inference in place of an intractable posterior but now for the density <i>q</i>(<b>θ</b><sub>z</sub>, <b>z</b><sub>0</sub>) instead. Given prior density assumptions of  <i>p</i>(<b>θ</b><sub>z</sub>) and <i>p</i>(<b>z</b><sub>0</sub>) in a similar vein as above, the ELBO function for this PGM is constructed as:
+where the resulting output observations are derived from an initial latent state <b>z</b><sub>0</sub> and the dynamics 
+parameters <b>θ</b><sub>z</sub>. As before, a variational approximation is considered for inference in place of an
+intractable posterior but now for the density <i>q</i>(<b>θ</b><sub>z</sub>, <b>z</b><sub>0</sub>) instead. Given 
+prior density assumptions of  <i>p</i>(<b>θ</b><sub>z</sub>) and <i>p</i>(<b>z</b><sub>0</sub>) in a similar vein as 
+above, the ELBO function for this PGM is constructed as:
 
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/172078432-50f30273-508a-4286-98a4-bdd3fa03bc03.png" alt="sysID ELBO" /></p>
-where again the first term is a reconstruction likelihood and the terms following represent KL-Divergence losses over the inferred variables.
+where again the first term is a reconstruction likelihood and the terms following represent KL-Divergence losses over 
+the inferred variables.
 
 <p> </p>
-The given formulation here is the most general form for this line of models and other works can be covered under special assumptions or restrictions of how <i>q</i>(<b>θ</b><sub>z</sub>) and <i>p</i>(<b>θ</b><sub>z</sub>) are modeled. Original Neural SSM parameter works consider Linear-Gaussian SSMs as the transition function and introduce non-linearity by varying the transition parameters over time as <b>θ</b><sub>z<sub>0:T</sub></sub><sup>[1,2,3]</sup>. However, as shown in Fig. [2B<sub>1</sub>](#latentSchematic), the result of this results in convoluted temporal modeling and devolves into the same state estimation problem as now the time-varying parameters rely on near-term observations for correctness<sup>[8,20]</sup>. Rather than time-varying, the system parameters could be considered an optimized global variable, in which the underlying dynamics function becomes a Bayesian neural network in a VAE's latent space<sup>[5]</sup> and is shown in Fig. [2B<sub>2</sub>](#latentSchematic). Restricting these parameters to be deterministic results in a model of the form presented in Latent ODE<sup>[10]</sup>. The furthest restriction in forgoing stochasticity in the inference of <b>z</b><sub>0</sub> results in the suite of models as presented in [4]. 
+The given formulation here is the most general form for this line of models and other works can be covered under 
+special assumptions or restrictions of how <i>q</i>(<b>θ</b><sub>z</sub>) and <i>p</i>(<b>θ</b><sub>z</sub>) are 
+modeled. Original Neural SSM parameter works consider Linear-Gaussian SSMs as the transition function and 
+introduce non-linearity by varying the transition parameters over time as <b>θ</b><sub>z<sub>0:T</sub></sub><sup>[1,2,3]</sup>. 
+However, as shown in Fig. [2B<sub>1</sub>](#latentSchematic), the result of this results in convoluted temporal 
+modeling and devolves into the same state estimation problem as now the time-varying parameters rely on near-term 
+observations for correctness<sup>[8,20]</sup>. Rather than time-varying, the system parameters could be considered 
+an optimized global variable, in which the underlying dynamics function becomes a Bayesian neural network in a VAE's 
+latent space<sup>[5]</sup> and is shown in Fig. [2B<sub>2</sub>](#latentSchematic). Restricting these parameters to 
+be deterministic results in a model of the form presented in Latent ODE<sup>[10]</sup>. The furthest restriction in 
+forgoing stochasticity in the inference of <b>z</b><sub>0</sub> results in the suite of models as presented in [4]. 
 
 <p> </p>
-Regardless of the precise assumptions, this framework builds a strong latent dynamics function that enables long-term forecasting and, in some settings, even full-scale system identification<sup>[1,4]</sup> of physical systems. This is done at the cost of a harder inference task given no access to dynamics correction during generation and for full identification tasks, often requires a large number of training samples over the potential system state space<sup>[4,5]</sup>.
+Regardless of the precise assumptions, this framework builds a strong latent dynamics function that enables long-term 
+forecasting and, in some settings, even full-scale system identification<sup>[1,4]</sup> of physical systems. This is 
+done at the cost of a harder inference task given no access to dynamics correction during generation and for full 
+identification tasks, often requires a large number of training samples over the potential system state space<sup>[4,5]</sup>.
 
 <!-- INITIAL STATE -->
 <a name="initialState"></a>
@@ -129,14 +168,21 @@ Regardless of the precise assumptions, this framework builds a strong latent dyn
 
 As the transition dynamics and the observation space are intentionally disconnected in this framework, 
 the problem of inferring a strong initial latent state from which to forecast is an important consideration 
-when designing a neural state-space model. This is primarily a task- and data-dependent choice, 
+when designing a neural state-space model<sup>[30]</sup>. This is primarily a task- and data-dependent choice, 
 in which the architecture follows the data structure. Thankfully, much work has been done in other research 
 directions on designing good latent encoding models. As such, works in this area often draw from them. 
 This section is split into three parts - one on the usual architecture for high-dimensional image tasks, 
 one on lower-dimensional and/or miscellaneous encoders, and one on the different forms of inference for the initial
 state depending on which sequence portions are observed.
 
-<b>Image-based Encoders</b>: Unsurprisingly, the common architecture used in latent image encoding is a convolutional neural network (CNN) given its inherent bias toward spatial feature extraction<sup>[1,3,4,5]</sup>. Works are mixed between either having the sequential input reshaped as frames stacked over the channel dimension or simply running the CNN over each observed frame separately and passing the concatenated embedding into an output layer. Regardless of methodology, a few frames are assumed as observations for initialization, as multiple timesteps are required to infer the initial system movement. A subset of works considers second-order latent vector spaces, in which the encoder is explicitly split into two individual position and momenta functions, taking single and multiple frames respectively<sup>[5]</sup>.
+<b>Image-based Encoders</b>: Unsurprisingly, the common architecture used in latent image encoding is a convolutional 
+neural network (CNN) given its inherent bias toward spatial feature extraction<sup>[1,3,4,5]</sup>. Works are mixed
+between either having the sequential input reshaped as frames stacked over the channel dimension or simply running 
+the CNN over each observed frame separately and passing the concatenated embedding into an output layer. Regardless 
+of methodology, a few frames are assumed as observations for initialization, as multiple timesteps are required to 
+infer the initial system movement. A subset of works considers second-order latent vector spaces, in which the 
+encoder is explicitly split into two individual position and momenta functions, taking single and multiple frames 
+respectively<sup>[5]</sup>.
 
 <a name="initialStateSchematic"></a>
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/173459329-c48b1f65-2b26-4287-96e9-575a4bc8c540.png", width=500, alt="initial state visualization" /></p>
@@ -170,10 +216,16 @@ ikelihood optimization and learned vector space.
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/204066391-09e3d29e-a0bd-47d6-bfee-f11c2b71fa93.png", width=500, alt="initial latent variable comparison" /></p>
 <p align='center'>Fig N. Schematic of the difference between <b>z</b><sub>0</sub> and <b>z</b><sub>init</sub></b> formulations.
 
-Saying that, there is not much work exploring the considerations for each approach, besides ad-hoc solutions to bridge 
+Saying that, generally there is a lack of work exploring the considerations for each approach, besides ad-hoc solutions to bridge 
 the gap between the latent encoder and dynamics function distributions<sup>[5]</sup>. This gap can stem from 
 optimization problems caused by imbalanced reconstruction terms between dynamics and initial states or in cases 
 where the initial state distribution is far enough away from the data distribution of downstream frames. 
+
+However, a recent work "Learning Neural State-Space Models: Do we need a state estimator?" [30] is the first detailed 
+study into the considerations of initial state inference, providing ablations across increasing difficulties of 
+datasets and inference forms. In their work, they found that to get competitive performance of neural SSMs on some
+dynamical systems, more advanced architectures were required (feed-forward or LSTM networks). Notably, they only evaluate
+on the <b>z</b><sub>k</sub></b> form, varying architectural choices.
 
 A variety of empirical techniques have been proposed to tackle this gap, much in the same spirit of empirical 
 VAE stability 'tricks.' These include separated <b>x</b><sub>0</sub> and <b>x</b><sub>1:T</sub> terms 
@@ -294,7 +346,9 @@ is an ongoing topic of interest. Thus far, the reigning approaches are:
 
 <!-- META-LEARNING -->
 <!-- <a name="metaLearning"></a>
-## Meta-Learning Dynamics -->
+## Meta-Learning Dynamics
+
+One recent but growing extension of neural state-space models are the incorporation of meta-learning techniques -->
 
 
 <!-- IMPLEMENTATION -->
@@ -636,3 +690,4 @@ README editing PR with your suggested updates. Even tackling items on the To-Do 
 27. Rui Wang, Robin Walters, and Rose Yu. Meta-learning dynamics forecasting using task inference. arXiv preprint arXiv:2102.10271, 2021.
 28. Kingma Diederik P, Welling Max. Auto-encoding variational bayes // arXiv preprint arXiv:1312.6114.2013.
 29. Xiajun Jiang, Zhiyuan Li, Ryan Missel, Md Shakil Zaman, Brian Zenger, Wilson W Good, Rob S MacLeod, John L Sapp, and Linwei Wang. Few-shot generation of personalized neural surrogates for cardiac simulation via bayesian meta-learning. In International Conference on Medical Image Computing and Computer-Assisted Intervention, pages 46–56. Springer, 2022.
+30. Marco Forgione, Manas Mejari, and Dario Piga. Learning neural state-space models: do we need a state estimator? arXiv preprint arXiv:2206.12928, 2022.
