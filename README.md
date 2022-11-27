@@ -89,7 +89,7 @@ The PGM associated with each approach is determined by the latent variable chose
 
 <a name="latentSchematic"></a>
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/203471172-6dcbb898-d2fb-411f-b486-ed153b95bfc6.png" alt="latent variable schematic" /></p>
-<p align='center'>Fig 2. Schematic of latent variable PGMs in Neural SSMS<sup>[MetaLearning]</sup>.</p>
+<p align='center'>Fig 2. Schematic of latent variable PGMs in Neural SSMS.</p>
 
 
 <b>System states as latent variables (State Estimation)</b>: The intuitive choice for the latent variable is the 
