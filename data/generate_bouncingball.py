@@ -144,11 +144,11 @@ if __name__ == '__main__':
     cannon = BallBox(dt=0.5, res=(32*scale, 32*scale), init_pos=(16*scale, 16*scale), init_std=8, wall=None, gravity=(0.0, 0.0), ball_color="white")
     i, s = cannon.run(delay=None, iterations=200, sequences=train_size_generate, radius=4, angle_limits=(0, 360), velocity_limits=(5.0, 10.0), save='npz')
 
-    rows = np.any(np.all(i.reshape([i.shape[0], i.shape[1], -1])) == 0, axis=0)
-    i = np.delete(i, rows, 0)
-    s = np.delete(s, rows, 0)
-    i = i[:train_size_save, :]
-    s = s[:train_size_save, :]
+    # rows = np.any(np.all(i.reshape([i.shape[0], i.shape[1], -1])) == 0, axis=0)
+    # i = np.delete(i, rows, 0)
+    # s = np.delete(s, rows, 0)
+    # i = i[:train_size_save, :]
+    # s = s[:train_size_save, :]
 
     i[i > 0] = 1
     i[i == 0] = 0.32
@@ -187,16 +187,6 @@ if __name__ == '__main__':
     train_size = train_images.shape[0]
     test_size = test_images.shape[0]
 
-    # Plot some examples
-    def movie_to_frame(images):
-        """ Compiles a list of images into one composite frame """
-        n_steps, w, h = images.shape
-        colors = np.linspace(0.4, 1, n_steps)
-        image = np.zeros((w, h))
-        for i, color in zip(images, colors):
-            image = np.clip(image + i * color, 0, color)
-        return image
-
     # Make sure all directories are made beforehand
     if not os.path.exists(f"{base_dir}/"):
         os.mkdir(f"{base_dir}/")
@@ -215,17 +205,6 @@ if __name__ == '__main__':
 
     if not os.path.exists(f"{base_dir}/test_tars/"):
         os.mkdir(f"{base_dir}/test_tars/")
-
-    # Grab random samples and save stacked samples from sequence
-    selected_idx = np.random.choice(train_size, 10, replace=False)
-    for idx in selected_idx:
-        plt.imshow(movie_to_frame(train_images[idx]), cmap='gray')
-        plt.savefig(f'{base_dir}/examples/train_{idx}.png')
-
-    selected_idx = np.random.choice(test_size, 10, replace=False)
-    for idx in selected_idx:
-        plt.imshow(movie_to_frame(test_images[idx]), cmap='gray')
-        plt.savefig(f'{base_dir}/examples/test_{idx}.png')
 
     # Permute the sets and states together
     p = np.random.permutation(train_images.shape[0])
