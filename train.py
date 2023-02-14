@@ -28,6 +28,8 @@ def parse_args():
     parser.add_argument('--system_identification', type=bool, default=True,
                         help='whether to use (True) system identification or (False) state estimation model versions'
                              'note that some baselines ignore this parameter and are fixed')
+    parser.add_argument('--stochastic', type=lambda x: bool(strtobool(x)), default=False,
+                        help='whether the dynamics parameters are stochastic')
 
     # ODE Integration parameters
     parser.add_argument('--integrator', type=str, default='rk4', help='which ODE integrator to use')
@@ -62,8 +64,6 @@ def parse_args():
 
     # Z0 inference parameters
     parser.add_argument('--z_amort', type=int, default=5, help='how many true frames to use in z0 inference')
-    parser.add_argument('--fix_variance', type=lambda x: bool(strtobool(x)),
-                        default=False, help='whether to fix variance in z0 encoding')
 
     # Timesteps to generate out
     parser.add_argument('--generation_len', type=int, default=15, help='total length to generate (including z_amort)')
@@ -117,7 +117,9 @@ if __name__ == '__main__':
                                                                lr_monitor,
                                                                checkpoint_callback
                                                            ],
-                                                           max_epochs=arg.num_epochs, check_val_every_n_epoch=10,
+                                                           max_epochs=arg.num_epochs,
+                                                           gradient_clip_val=5.0,
+                                                           check_val_every_n_epoch=10,
                                                            auto_select_gpus=True, reload_dataloaders_every_n_epochs=10)
     # Start training from scratch or a checkpoint
     if arg.ckpt_path == 'None':

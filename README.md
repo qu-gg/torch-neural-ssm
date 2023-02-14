@@ -19,15 +19,22 @@ This repository (currently) focuses primarily on considerations related to train
 <!-- CITATION -->
 <a name="citation"></a>
 ## Citation
-If you found the information helpful for your work or use portions of this repo in research development, please consider citing:
+If you found the information helpful for your work or use portions of this repo in research development, please consider 
+citing one of the following works:
 ```
-@misc{missel2022torchssm,
-    title={TorchSSM},
+@misc{missel2022torchneuralssm,
+    title={TorchNeuralSSM},
     author={Missel, Ryan},
     publisher={Github},
     journal={Github repository},
     howpublished={\url{https://github.com/qu-gg/torchssm}},
     year={2022},
+}
+
+@inproceedings{jiangsequentialLVM,
+  title={Sequential Latent Variable Models for Few-Shot High-Dimensional Time-Series Forecasting},
+  author={Jiang, Xiajun and Missel, Ryan and Li, Zhiyuan and Wang, Linwei},
+  booktitle={The Eleventh International Conference on Learning Representations}
 }
 ```
 
