@@ -69,7 +69,7 @@ class BayesNeuralODE(LatentDynamicsModel):
         x_rec = self.decoder(zt)
         return x_rec, zt
 
-    def model_specific_loss(self, x, x_rec, x_rev, train=True):
+    def model_specific_loss(self, x, x_rec, train=True):
         """ A standard KL prior is put over the weight codes of the hyper-prior to encourage good latent structure """
         # Get KL loss on Bayesian dynamics function
         kl_bayes = self.bayes_loss(self.dynamics_func)

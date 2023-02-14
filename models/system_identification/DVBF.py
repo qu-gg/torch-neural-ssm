@@ -251,7 +251,7 @@ class DVBF(LatentDynamicsModel):
         z_s = torch.stack(z_s, dim=1)
         return x_rec, z_s
 
-    def model_specific_loss(self, x, x_rec, zts, train=True):
+    def model_specific_loss(self, x, x_rec, train=True):
         """ KL term between the parameter distribution w and a normal prior"""
         w_mus = torch.stack(self.w_mus, dim=1)
         w_log_vars = torch.stack(self.w_log_vars, dim=1)

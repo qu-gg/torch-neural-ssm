@@ -22,7 +22,7 @@ class LSTM_SI(LatentDynamicsModel):
         self.dynamics_func = nn.LSTMCell(input_size=args.latent_dim, hidden_size=args.num_hidden)
         self.dynamics_out = nn.Linear(args.num_hidden, args.latent_dim)
 
-    def forward(self, x):
+    def forward(self, x, generation_len):
         """
         Forward function of the RGN SSM model
         :param x: data observation, which is a timeseries [BS, Timesteps, N Channels, Dim1, Dim2]

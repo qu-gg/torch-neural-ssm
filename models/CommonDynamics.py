@@ -11,11 +11,13 @@ import shutil
 import numpy as np
 import torch.nn as nn
 import pytorch_lightning
+import matplotlib.pyplot as plt
 
-from utils.plotting import show_images, get_embedding_trajectories
-from utils.metrics import vpt, dst, r2fit, vpd, normalized_pixel_mse
-from utils.utils import determine_annealing_factor, CosineAnnealingWarmRestartsWithDecayAndLinearWarmup
+from sklearn.manifold import TSNE
+from utils.metrics import vpt, dst, r2fit, vpd
 from models.CommonVAE import LatentStateEncoder, EmissionDecoder
+from utils.plotting import show_images, get_embedding_trajectories
+from utils.utils import determine_annealing_factor, CosineAnnealingWarmRestartsWithDecayAndLinearWarmup
 
 
 class LatentDynamicsModel(pytorch_lightning.LightningModule):
@@ -53,7 +55,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         """ Placeholder function for the dynamics forward pass """
         raise NotImplementedError("In forward function: Latent Dynamics function not specified.")
 
-    def model_specific_loss(self, x, x_rec, zts, train=True):
+    def model_specific_loss(self, x, x_rec, train=True):
         """ Placeholder function for any additional loss terms a dynamics function may have """
         return 0.0
 
@@ -152,18 +154,15 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         images = images[:, random_start:random_start + generation_len + self.args.z_amort]
         states = states[:, random_start:random_start + generation_len + self.args.z_amort]
 
-        # Get backwards sequence
-        images_rev = torch.flip(images, dims=[1])
-
         # Get predictions
         preds, embeddings = self(images, generation_len)
 
         # Restrict images to start from after inference, for metrics and likelihood
         images = images[:, self.args.z_amort:]
         states = states[:, self.args.z_amort:]
-        return images, images_rev, states, labels, preds, embeddings
+        return images, states, labels, preds, embeddings
 
-    def get_step_losses(self, images, images_rev, preds):
+    def get_step_losses(self, images, preds):
         """
         Handles getting the ELBO terms for the given step
         :param images: ground truth images
@@ -178,7 +177,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         klz = self.encoder.kl_z_term()
 
         # Get the loss terms from the specific latent dynamics loss
-        dynamics_loss = self.model_specific_loss(images, images_rev, preds)
+        dynamics_loss = self.model_specific_loss(images, preds)
         return likelihood, klz, dynamics_loss
 
     def training_step(self, batch, batch_idx):
@@ -192,10 +191,10 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         generation_len = np.random.randint(1, self.args.generation_len) if self.args.generation_varying is True else self.args.generation_len
 
         # Get model outputs from batch
-        images, images_rev, states, labels, preds, embeddings = self.get_step_outputs(batch, generation_len)
+        images, states, labels, preds, embeddings = self.get_step_outputs(batch, generation_len)
 
         # Get model loss terms for the step
-        likelihood, klz, dynamics_loss = self.get_step_losses(images, images_rev, preds)
+        likelihood, klz, dynamics_loss = self.get_step_losses(images, preds)
 
         # Log ELBO loss terms
         self.log("likelihood", likelihood, prog_bar=True)
@@ -222,10 +221,6 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         if batch_idx < self.args.batches_to_save:
             out["preds"] = preds.detach()
             out["images"] = images.detach()
-
-            # For code vector based models (i.e. the proposed models) also add their local codes
-            if hasattr(self.dynamics_func, 'embeddings'):
-                out['code_vectors'] = self.dynamics_func.embeddings.detach()
         return out
 
     def training_epoch_end(self, outputs):
@@ -257,11 +252,10 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         :param batch_idx: how far in the epoch this batch is
         """
         # Get model outputs from batch
-        images, images_rev, states, labels, preds, embeddings = self.get_step_outputs(batch, self.args.generation_validation_len)
+        images, states, labels, preds, embeddings = self.get_step_outputs(batch, self.args.generation_validation_len)
 
         # Get model loss terms for the step
-        likelihood, klz, dynamics_loss = self.get_step_losses(images, images_rev, preds)
-        del images_rev, states, labels, embeddings
+        likelihood, klz, dynamics_loss = self.get_step_losses(images, preds)
 
         # Log validation likelihood and metrics
         self.log("val_likelihood", likelihood, prog_bar=True)
@@ -309,7 +303,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         # TODO - Output N runs per batch to get averaged metrics rather than one run
         images, images_rev, states, labels, preds, embeddings = self.get_step_outputs(batch, self.args.generation_len)
         return {"states": states.detach(), "embeddings": embeddings.detach(),
-                "preds": preds.detach(), "images": images.detach()}
+                "preds": preds.detach(), "images": images.detach(), "labels": labels.detach()}
 
     def test_epoch_end(self, outputs):
         """
@@ -317,23 +311,19 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         :param outputs: list of outputs from the validation steps at batch 0
         """
         # Stack all outputs
-        preds, images, states, embeddings = [], [], [], []
+        preds, images, states, embeddings, labels = [], [], [], [], []
         for output in outputs:
             preds.append(output["preds"])
             images.append(output["images"])
             states.append(output["states"])
-            embeddings.append(output["embeddings"])
+            labels.append(output["labels"])
 
-        preds = torch.vstack(preds)
-        images = torch.vstack(images)
-        states = torch.vstack(states)
-        embeddings = torch.vstack(embeddings)
-
-        # Only get metrics on unseen part in generation
-        preds = preds[:, self.args.training_len:]
-        images = images[:, self.args.training_len:]
-        states = states[:, self.args.training_len:]
-        embeddings = embeddings[:, self.args.training_len:]
+        preds = np.vstack(preds)
+        images = np.vstack(images)
+        states = np.vstack(states)
+        embeddings = np.vstack(embeddings)
+        labels = np.vstack(labels)
+        del outputs
 
         # Print statistics over the full set
         pixel_mse = self.reconstruction_loss(preds, images).detach().cpu().numpy()
@@ -378,12 +368,32 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         np.save(f"{output_path}/test_{self.args.dataset}_pixelmse.npy", pixel_mse)
         np.save(f"{output_path}/test_{self.args.dataset}_recons.npy", preds.detach().cpu().numpy())
         np.save(f"{output_path}/test_{self.args.dataset}_images.npy", images.detach().cpu().numpy())
+        np.save(f"{output_path}/test_{self.args.dataset_split}_labels.npy", labels)
 
         # Save some examples
         show_images(images[:10], preds[:10], f"{output_path}/test_{self.args.dataset}_examples.png", num_out=5)
 
         # Save trajectory examples
         get_embedding_trajectories(embeddings[0], states[0], f"{output_path}/")
+
+        # Get Z0 TSNE
+        tsne = TSNE(n_components=2, perplexity=30, learning_rate=200, n_iter=1000, early_exaggeration=12)
+        fitted = tsne.fit(embeddings[:, 0])
+        print("Finished after {} iterations".format(fitted.n_iter))
+        tsne_embedding = fitted.embedding_
+
+        # Plot prototypes
+        colors = {0: 'coral', 1: 'purple', 2: 'orange', 3: 'blue', 4: 'springgreen', 5: 'green', 6: 'cadetblue',
+                  7: 'red', 8: 'gold', 9: 'greenyellow', 10: 'black', 11: 'cyan', 12: 'dodgerblue',
+                  13: 'm', 14: 'orchid', 15: 'gray'}  # , 'k'}
+        for i in np.unique(labels):
+            subset = tsne_embedding[np.where(labels == i)[0], :]
+            plt.scatter(subset[:, 0], subset[:, 1], c=colors[int(i)])
+
+        plt.title("t-SNE Plot of Z0 Embeddings")
+        plt.legend(np.unique(labels), loc='center left', bbox_to_anchor=(1, 0.5))
+        plt.savefig(f"{output_path}/test_{self.args.dataset_split}_Z0tsne.png", bbox_inches='tight')
+        plt.close()
 
         # Save metrics to JSON in checkpoint folder
         with open(f"{output_path}/test_{self.args.dataset}_metrics.json", 'w') as f:
@@ -393,3 +403,11 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         with open(f"{output_path}/test_{self.args.dataset}_excel.txt", 'w') as f:
             f.write(f"{metrics['mse_mean']},{metrics['mse_std']},{metrics['vpt_mean']},{metrics['vpt_std']},"
                     f"{metrics['dst_mean']},{metrics['dst_std']},{metrics['vpd_mean']},{metrics['vpd_std']}")
+
+
+        # Save metrics to an easy excel conversion style
+        with open(f"{output_path}/test_{self.args.dataset_split}_excel.txt", 'w') as f:
+            f.write(f"{metrics['mse_mean']:0.3f}({metrics['mse_std']:0.3f}),"
+                    f"{metrics['vpt_mean']:0.3f}({metrics['vpt_std']:0.3f}),"
+                    f"{metrics['dst_mean']:0.3f}({metrics['dst_std']:0.3f}),"
+                    f"{metrics['vpd_mean']:0.3f}({metrics['vpd_std']:0.3f})")

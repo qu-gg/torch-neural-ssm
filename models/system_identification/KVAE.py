@@ -307,7 +307,7 @@ class KVAE(LatentDynamicsModel):
         self.y = self.y.reshape([batch_size, seq_len, self.args.dim, self.args.dim])
         return self.y, torch.zeros([batch_size, seq_len])
 
-    def model_specific_loss(self, x, x_rec, zts, train=True):
+    def model_specific_loss(self, x, x_rec, train=True):
         # batch_size, seq_len = x.shape[0], x.shape[1]
         # Input is an image so reduce down to [batch_size, flattened_dim, seq_len]
         x = x.reshape(x.shape[0], x.shape[1], -1)
