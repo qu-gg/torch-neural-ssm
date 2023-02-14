@@ -515,10 +515,7 @@ plots every training epoch end.
 
 ### Implemented Dynamics
 
-<b>System Identification Models</b>: 
-
-<p> </p>
-For the system identification models, we provide a variety of dynamics functions that resemble the general and special 
+<b>System Identification Models</b>: For the system identification models, we provide a variety of dynamics functions that resemble the general and special 
 cases detailed above, which are provided in Fig N. below. The most general version is that of the Bayesian Neural ODE, 
 in which a neural ordinary differential equation<sup>[21]</sup> is sampled from a set of optimized distributional 
 parameters and used as the latent dynamics function 
@@ -541,12 +538,9 @@ out to any horizon easily and we provide small sample datasets of <code>200</cod
 
 <p> </p>
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/172108058-481009a0-41c9-449e-bc0f-7b7a45ecefe0.png", height=400, alt="sysID models" /></p>
-<p align='center'>Fig N. Complete model schematic for system identification's implemented dynamics functions.</p>
+<p align='center'>Fig N. Model schematics for system identification's implemented dynamics functions.</p>
  
-<b>State Estimation Models</b>: 
-
-<p> </p>
-For the state estimation line, we provide a reimplementation of the classic Neural SSM work Deep Kalman 
+<b>State Estimation Models</b>: For the state estimation line, we provide a reimplementation of the classic Neural SSM work Deep Kalman 
 Filter<sup>[7]</sup> alongside state estimation versions of the above, provided in Fig. N below. The DKF model modifies
 the standard Kalman Filter Gaussian transition function to incorporate non-linearity and expressivity by parameterizing 
 the distribution parameters with neural networks 
@@ -560,7 +554,7 @@ the latent state while <i>generation</i> is used to test the forecasting abiliti
 
 <p> </p>
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/172186199-602a868b-77e4-44a2-b88d-64124c43afb9.png", height=400, alt="stateEst models" /></p>
-<p align='center'>Fig N. Complete model schematic for state estimation's implemented dynamics functions.</p>
+<p align='center'>Fig N. Model schematics for state estimation's implemented dynamics functions.</p>
 
 
 <!-- METRICS -->
@@ -622,9 +616,52 @@ interface to compare the tuning runs. In order to run custom tuning tasks, simpl
 repository root directory and rename the tune run "name" to redirect the output there. Please refer to RayTune's
 relevant <a href="https://docs.ray.io/en/latest/tune/examples/tune-pytorch-lightning.html">documentation</a> for information.
 
-<!-- HAMILTONIAN -->
+<!-- PENDULUM -->
 <a name="hamiltonian"></a>
-## Hamiltonian Systems (Pendulum + Mass-Spring)
+## Pendulum Dynamics
+
+Here we report the results of tuning each of the models on the Hamiltonian physics dataset Pendulum. For each model, 
+we highlight their best-performing hyperparameters with respect to the validation extrapolation MSE. For experiment 
+going forwards, these hyperparameters will be used in experiments of similar complexity.
+
+We test two environments for the Pendulum dataset, a fixed-point one-color pendulum and a multi-point multi-color 
+pendulum set of increased complexity. As described in [4], each individual sequence is sampled from a uniform
+distribution over physical parameters like mass, gravity, and pivot length. 
+We describe data generation above in the <b>Data</b> section.
+
+<details><summary><em>[TO-DO: Click to show the results for Fixed-Point Pendulum]</em></summary>
+Coming soon.
+</details>
+
+<br>
+
+<details><summary><em>[TO-DO: Click to show the results for Multi-Point Pendulum tuning]</em></summary>
+Coming soon.
+</details>
+
+
+<!-- BOUNCING BALL -->
+<a name="bouncingball"></a>
+## Bouncing Ball Dynamics
+
+Similar to above, we highlight the results and hyperparameters of each model for the Bouncing Ball dataset.
+
+<details><summary><em>[TO-DO: Click to show the results for Bouncing Ball tuning]</em></summary>
+Coming soon.
+</details>
+
+<!-- ABLATIONS -->
+<a name="ablations"></a>
+## Ablation Studies
+
+<b>ODE Solvers</b>: To measure the impact that ODE Solvers have on the optimized dynamics models, we performed an ablation on the available
+solvers that exist within the <b>torchdiffeq</b> library, including both fixed and adaptive solvers. We make note of
+their respective training times due to increased solution complexity and train each ODE solver over a variety of parameters
+depending on their type (e.g. step size or solution tolerances).
+
+<details><summary><em>[Click to show the results for the ODE Solver ablation]</em></summary>
+Coming soon.
+</details>
 
 <!-- Miscellaneous -->
 <a name="misc"></a>
@@ -642,6 +679,9 @@ and a section on how to find the references used throughout the repo.
 - Fixed vs variable generation lengths
 - z<sub>0</sub> inference scheme (no overlap, overlap-by-one, full overlap)
 - Use of ODE solvers (fixed, adaptive, tolerances)
+- Different forms of learning rate schedulers
+- Linear versus CNN decoder
+- Activation functions in the latent dynamics function
 
 <h4>Repository-wise</h4>
 
