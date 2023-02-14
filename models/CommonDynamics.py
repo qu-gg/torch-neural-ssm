@@ -36,7 +36,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         self.exptop = exptop
 
         # Encoder + Decoder
-        self.encoder = LatentStateEncoder(self.args.z_amort, self.args.num_filt, 1, self.args.latent_dim, self.args.fix_variance)
+        self.encoder = LatentStateEncoder(self.args.z_amort, self.args.num_filt, 1, self.args.latent_dim, self.args.stochastic)
         self.decoder = EmissionDecoder(self.args.batch_size, self.args.generation_len, self.args.dim, self.args.num_filt, 1, self.args.latent_dim)
 
         # Recurrent dynamics function
@@ -108,7 +108,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
             'num_filt': self.args.num_filt,
             'latent_act': self.args.latent_act,
             'z_amort': self.args.z_amort,
-            'fix_variance': self.args.fix_variance,
+            'stochastic': self.args.stochastic,
             'system_identification': self.args.system_identification,
             'learning_rate': self.args.learning_rate,
             'number_params': pytorch_total_params,
