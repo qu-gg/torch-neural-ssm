@@ -63,6 +63,40 @@ class Gaussian(nn.Module):
         return mu, logvar, z
 
 
+class GroupSwish(nn.Module):
+    def __init__(self, groups):
+        """
+        Swish activation function that works on GroupConvolution by reshaping all input groups back into their
+        batch shapes, activating them, then reshaping them to 1D GroupConv filters
+        """
+        super().__init__()
+        self.silu = nn.SiLU()
+        self.groups = groups
+
+    def forward(self, x):
+        n_ch_group = x.size(1) // self.groups
+        t = x.shape[2:]
+        x = x.reshape(-1, self.groups, n_ch_group, *t)
+        return self.silu(x).reshape(1, self.groups * n_ch_group, *t)
+
+
+class GroupTanh(nn.Module):
+    def __init__(self, groups):
+        """
+        Tanh activation function that works on GroupConvolution by reshaping all input groups back into their
+        batch shapes, activating them, then reshaping them to 1D GroupConv filters
+        """
+        super().__init__()
+        self.tanh = nn.Tanh()
+        self.groups = groups
+
+    def forward(self, x):
+        n_ch_group = x.size(1) // self.groups
+        t = x.shape[2:]
+        x = x.reshape(self.groups, n_ch_group, *t)
+        return self.tanh(x).reshape(1, self.groups * n_ch_group, *t)
+
+
 class Flatten(nn.Module):
     def forward(self, input):
         """
