@@ -79,7 +79,9 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         For CosineAnnealing, we set the LR bounds to be [LR * 1e-2, LR]
         """
         optim = torch.optim.AdamW(self.parameters(), lr=self.args.learning_rate)
-        scheduler = CosineAnnealingWarmRestartsWithDecayAndLinearWarmup(optim, T_0=5000, T_mult=1,
+        scheduler = CosineAnnealingWarmRestartsWithDecayAndLinearWarmup(optim,
+                                                                        T_0=self.args.restart_interval,
+                                                                        T_mult=1,
                                                                         eta_min=self.args.learning_rate * 1e-2,
                                                                         warmup_steps=600, decay=0.90)
 
@@ -171,7 +173,8 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         :return: likelihood, kl on z0, model-specific dynamics loss
         """
         # Reconstruction loss for the sequence and z0
-        likelihood = self.reconstruction_loss(preds, images).sum([2, 3]).flatten().mean()
+        likelihood = self.reconstruction_loss(preds, images)
+        likelihood = likelihood.reshape([likelihood.shape[0] * likelihood.shape[1], -1]).sum([-1]).mean()
 
         # Initial encoder loss, KL[q(z_K|x_0:K) || p(z_K)]
         klz = self.encoder.kl_z_term()
@@ -293,6 +296,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         show_images(outputs[0]["images"], outputs[0]["preds"],
                     f'{self.version_path}/images/recon{self.current_epoch}val.png', num_out=5)
 
+    @torch.no_grad()
     def test_step(self, batch, batch_idx):
         """
         PyTorch-Lightning testing step.
@@ -301,10 +305,22 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         """
         # Get model outputs from batch
         # TODO - Output N runs per batch to get averaged metrics rather than one run
-        images, images_rev, states, labels, preds, embeddings = self.get_step_outputs(batch, self.args.generation_len)
-        return {"states": states.detach(), "embeddings": embeddings.detach(),
-                "preds": preds.detach(), "images": images.detach(), "labels": labels.detach()}
+        images, states, labels, preds, embeddings = self.get_step_outputs(batch, self.args.generation_len)
 
+        pixel_mse_recon = self.reconstruction_loss(preds, images).mean([1, 2, 3])
+        test_vpt = vpt(images, preds.detach())[0]
+        test_dst = dst(images, preds.detach())[1]
+        test_vpd = vpd(images, preds.detach())[1]
+
+        # Build output dictionary
+        out = {"states": states.detach().cpu().numpy(), "embeddings": embeddings.detach().cpu().numpy(),
+               "preds": preds.detach().cpu().numpy(), "images": images.detach().cpu().numpy(),
+               "labels": labels.detach().cpu().numpy(),
+               "pixel_mse_recon": pixel_mse_recon.detach().cpu().numpy(),
+               "vpt": test_vpt, "dst": test_dst, "vpd": test_vpd}
+        return out
+
+    @torch.no_grad()
     def test_epoch_end(self, outputs):
         """
         For testing end, save the predictions, gt, and MSE to NPY files in the respective experiment folder
@@ -312,52 +328,60 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         """
         # Stack all outputs
         preds, images, states, embeddings, labels = [], [], [], [], []
+        mse_recons, vpts, dsts, vpds = [], [], [], []
         for output in outputs:
             preds.append(output["preds"])
             images.append(output["images"])
             states.append(output["states"])
             labels.append(output["labels"])
+            embeddings.append(output["embeddings"])
+
+            mse_recons.append(output["pixel_mse_recon"])
+            vpts.append(output["vpt"])
+            dsts.append(output["dst"])
+            vpds.append(output["vpd"])
 
         preds = np.vstack(preds)
         images = np.vstack(images)
         states = np.vstack(states)
         embeddings = np.vstack(embeddings)
         labels = np.vstack(labels)
+
+        pixel_mse = np.vstack(mse_recons)
+        vpts = np.vstack(vpts)
+        dsts = np.vstack(dsts)
+        vpds = np.vstack(vpds)
         del outputs
 
         # Print statistics over the full set
-        pixel_mse = self.reconstruction_loss(preds, images).detach().cpu().numpy()
-        vpt_mean, vpt_std = vpt(images, preds.detach())
-        dsts = dst(images, preds.detach())[0]
-        vpds = vpd(images, preds.detach())
         print("")
-        print(f"=> Pixel MSE: {np.mean(pixel_mse):4.5f}+-{np.std(pixel_mse):4.5f}")
-        print(f"=> VPT:       {vpt_mean:4.5f}+-{vpt_std:4.5f}")
+        print(f"=> Pixel Recon MSE: {np.mean(pixel_mse):4.5f}+-{np.std(pixel_mse):4.5f}")
+        print(f"=> VPT:       {np.mean(vpts):4.5f}+-{np.std(vpts):4.5f}")
         print(f"=> DST:       {np.mean(dsts):4.5f}+-{np.std(dsts):4.5f}")
         print(f"=> VPD:       {np.mean(vpds):4.5f}+-{np.std(vpds):4.5f}")
 
         metrics = {
-            "mse_mean": float(np.mean(pixel_mse)),
-            "mse_std": float(np.std(pixel_mse)),
-            "vpt_mean": float(vpt_mean),
-            "vpt_std": float(vpt_std),
+            "pixel_mse_mean": float(np.mean(pixel_mse)),
+            "pixel_mse_std": float(np.std(pixel_mse)),
+            "vpt_mean": float(np.mean(vpts)),
+            "vpt_std": float(np.std(vpts)),
             "dst_mean": float(np.mean(dsts)),
             "dst_std": float(np.std(dsts)),
             "vpd_mean": float(np.mean(vpds)),
             "vpd_std": float(np.std(vpds))
         }
 
-        # Get polar coordinates (sin and cos) of the angle for evaluation
-        sins = torch.sin(states[:, :, 0])
-        coss = torch.cos(states[:, :, 0])
-        states = torch.stack((sins, coss, states[:, :, 1]), dim=2)
+        # # Get polar coordinates (sin and cos) of the angle for evaluation
+        # sins = np.sin(states[:, :, 0])
+        # coss = np.cos(states[:, :, 0])
+        # states = np.stack((sins, coss, states[:, :, 1]), axis=2)
+        #
+        # # Get r2 score
+        # r2s = r2fit(embeddings, states, mlp=True)
 
-        # Get r2 score
-        r2s = r2fit(embeddings, states, mlp=True)
-
-        # Log each dimension's R2 individually
-        for idx, r in enumerate(r2s):
-            metrics[f"r2_{idx}"] = r
+        # # Log each dimension's R2 individually
+        # for idx, r in enumerate(r2s):
+        #     metrics[f"r2_{idx}"] = r
 
         # Set up output path and create dir
         output_path = f"{self.args.ckpt_path}/test_{self.args.dataset}"
@@ -365,10 +389,11 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
             os.mkdir(output_path)
 
         # Save files
-        np.save(f"{output_path}/test_{self.args.dataset}_pixelmse.npy", pixel_mse)
-        np.save(f"{output_path}/test_{self.args.dataset}_recons.npy", preds.detach().cpu().numpy())
-        np.save(f"{output_path}/test_{self.args.dataset}_images.npy", images.detach().cpu().numpy())
-        np.save(f"{output_path}/test_{self.args.dataset_split}_labels.npy", labels)
+        if self.args.save_files is True:
+            np.save(f"{output_path}/test_{self.args.dataset}_pixelmse.npy", pixel_mse)
+            np.save(f"{output_path}/test_{self.args.dataset}_recons.npy", preds)
+            np.save(f"{output_path}/test_{self.args.dataset}_images.npy", images)
+            np.save(f"{output_path}/test_{self.args.dataset}_labels.npy", labels)
 
         # Save some examples
         show_images(images[:10], preds[:10], f"{output_path}/test_{self.args.dataset}_examples.png", num_out=5)
@@ -392,7 +417,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
 
         plt.title("t-SNE Plot of Z0 Embeddings")
         plt.legend(np.unique(labels), loc='center left', bbox_to_anchor=(1, 0.5))
-        plt.savefig(f"{output_path}/test_{self.args.dataset_split}_Z0tsne.png", bbox_inches='tight')
+        plt.savefig(f"{output_path}/test_{self.args.dataset}_Z0tsne.png", bbox_inches='tight')
         plt.close()
 
         # Save metrics to JSON in checkpoint folder
@@ -401,13 +426,12 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
 
         # Save metrics to an easy excel conversion style
         with open(f"{output_path}/test_{self.args.dataset}_excel.txt", 'w') as f:
-            f.write(f"{metrics['mse_mean']},{metrics['mse_std']},{metrics['vpt_mean']},{metrics['vpt_std']},"
+            f.write(f"{metrics['pixel_mse_mean']},{metrics['pixel_mse_std']},{metrics['vpt_mean']},{metrics['vpt_std']},"
                     f"{metrics['dst_mean']},{metrics['dst_std']},{metrics['vpd_mean']},{metrics['vpd_std']}")
 
-
         # Save metrics to an easy excel conversion style
-        with open(f"{output_path}/test_{self.args.dataset_split}_excel.txt", 'w') as f:
-            f.write(f"{metrics['mse_mean']:0.3f}({metrics['mse_std']:0.3f}),"
+        with open(f"{output_path}/test_{self.args.dataset}_excel.txt", 'w') as f:
+            f.write(f"{metrics['pixel_mse_mean']:0.3f}({metrics['pixel_mse_std']:0.3f}),"
                     f"{metrics['vpt_mean']:0.3f}({metrics['vpt_std']:0.3f}),"
                     f"{metrics['dst_mean']:0.3f}({metrics['dst_std']:0.3f}),"
                     f"{metrics['vpd_mean']:0.3f}({metrics['vpd_std']:0.3f})")

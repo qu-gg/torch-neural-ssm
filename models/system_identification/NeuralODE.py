@@ -22,16 +22,14 @@ class ODEFunction(nn.Module):
         # Build network layers
         self.acts = nn.ModuleList([])
         self.layers = nn.ModuleList([])
-        self.layer_norms = nn.ModuleList([])
         for i, (n_in, n_out) in enumerate(zip(self.layers_dim[:-1], self.layers_dim[1:])):
             self.acts.append(get_act(args.latent_act) if i < args.num_layers else get_act('tanh'))
             self.layers.append(nn.Linear(n_in, n_out, device=args.gpus[0]))
-            self.layer_norms.append(nn.LayerNorm(n_out, device=args.gpus[0]) if True and i < args.num_layers else nn.Identity())
 
     def forward(self, t, x):
         """ Wrapper function for the odeint calculation """
-        for norm, a, layer in zip(self.layer_norms, self.acts, self.layers):
-            x = a(norm(layer(x)))
+        for a, layer in zip(self.acts, self.layers):
+            x = a(layer(x))
         return x
 
 

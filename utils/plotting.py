@@ -21,8 +21,9 @@ def show_images(images, preds, out_loc, num_out=None):
     assert type(num_out) is int or type(num_out) is None
 
     # Make sure objects are in numpy format
-    images = images.cpu().numpy()
-    preds = preds.cpu().numpy()
+    if not isinstance(images, np.ndarray):
+        images = images.cpu().numpy()
+        preds = preds.cpu().numpy()
 
     # Splice to the given num_out
     if num_out is not None:
@@ -66,8 +67,13 @@ def get_embedding_trajectories(embeddings, states, out_loc):
     :param embeddings: vector states over time
     :param states: ground truth physical parameter states
     """
+    # Make sure objects are in numpy format
+    if not isinstance(embeddings, np.ndarray):
+        embeddings = embeddings.cpu().numpy()
+        states = states.cpu().numpy()
+
     # Get embedding trajectory plots
-    for idx, embedding in enumerate(embeddings.permute([1, 0]).detach().cpu().numpy()):
+    for idx, embedding in enumerate(np.swapaxes(embeddings, 1, 0)):
         plt.plot(embedding, label=f"Dim {idx}")
 
     plt.title("Vector State Trajectories")
@@ -75,7 +81,7 @@ def get_embedding_trajectories(embeddings, states, out_loc):
     plt.close()
 
     # Get physical state trajectories
-    for idx, embedding in enumerate(states.permute([1, 0]).detach().cpu().numpy()):
+    for idx, embedding in enumerate(np.swapaxes(states, 1, 0)):
         plt.plot(embedding, label=f"Dim {idx}")
 
     plt.title("GT State Trajectories")

@@ -29,13 +29,13 @@ class LatentStateEncoder(nn.Module):
         self.initial_encoder = nn.Sequential(
             nn.Conv2d(z_amort, num_filters, kernel_size=5, stride=2, padding=(2, 2)),  # 14,14
             nn.BatchNorm2d(num_filters),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Conv2d(num_filters, num_filters * 2, kernel_size=5, stride=2, padding=(2, 2)),  # 7,7
             nn.BatchNorm2d(num_filters * 2),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Conv2d(num_filters * 2, num_filters * 4, kernel_size=5, stride=2, padding=(2, 2)),
             nn.BatchNorm2d(num_filters * 4),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.AvgPool2d(4),
             Flatten()
         )
@@ -107,13 +107,13 @@ class EmissionDecoder(nn.Module):
             # Perform de-conv to output space
             nn.ConvTranspose2d(self.conv_dim // 16, num_filters * 4, kernel_size=4, stride=1, padding=(0, 0)),
             nn.BatchNorm2d(num_filters * 4),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.ConvTranspose2d(num_filters * 4, num_filters * 2, kernel_size=5, stride=2, padding=(1, 1)),
             nn.BatchNorm2d(num_filters * 2),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.ConvTranspose2d(num_filters * 2, num_filters, kernel_size=5, stride=2, padding=(1, 1), output_padding=(1, 1)),
             nn.BatchNorm2d(num_filters),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.ConvTranspose2d(num_filters, 1, kernel_size=5, stride=1, padding=(2, 2)),
             nn.Sigmoid(),
         )

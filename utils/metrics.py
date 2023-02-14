@@ -22,8 +22,9 @@ def vpt(gt, preds, epsilon=0.010):
     :param epsilon: threshold for valid prediction
     """
     # Ensure on CPU and numpy
-    gt = gt.cpu().numpy()
-    preds = preds.cpu().numpy()
+    if not isinstance(gt, np.ndarray):
+        gt = gt.cpu().numpy()
+        preds = preds.cpu().numpy()
 
     # Get dimensions
     _, timesteps, height, width = gt.shape
@@ -76,8 +77,9 @@ def dst(gt, preds):
     :param preds: model predicted sequences
     """
     # Ensure on CPU and numpy
-    gt = gt.cpu().numpy()
-    preds = preds.cpu().numpy()
+    if not isinstance(gt, np.ndarray):
+        gt = gt.cpu().numpy()
+        preds = preds.cpu().numpy()
 
     # Get shapes
     num_samples, timesteps, height, width = gt.shape
@@ -147,8 +149,9 @@ def r2fit(latents, gt_state, mlp=False):
     r2s = []
 
     # Ensure on CPU and numpy
-    latents = latents.cpu().numpy()
-    gt_state = gt_state.cpu().numpy()
+    if not isinstance(latents, np.ndarray):
+        latents = latents.cpu().numpy()
+        gt_state = gt_state.cpu().numpy()
 
     # Convert to one large set of latent states
     latents = latents.reshape([latents.shape[0] * latents.shape[1], -1])

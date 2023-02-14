@@ -9,12 +9,14 @@ Can handle splitting automatically over available GPUs using PyTorch-Lightning
 """
 import os
 import argparse
+from distutils.util import strtobool
+
 import pytorch_lightning
 from pytorch_lightning.loggers import TensorBoardLogger
 from ray.tune.schedulers import ASHAScheduler
 
 from utils.dataloader import Dataset
-from utils.utils import get_exp_versions, get_model
+from utils.utils import get_exp_versions, get_model, StoreDictKeyPair
 
 from ray import tune
 from ray.tune.integration.pytorch_lightning import TuneReportCallback
@@ -24,36 +26,66 @@ def parse_args():
     """ General arg parsing for non-model parameters """
     parser = argparse.ArgumentParser()
 
-    # Experiment ID
-    parser.add_argument('--exptype', type=str, default='pendulum_3latent', help='experiment folder name')
-    parser.add_argument('--checkpt', type=str, default='None', help='checkpoint to resume training from')
-    parser.add_argument('--model', type=str, default='lstm_si', help='which model to use for training')
+    # Experiment ID and Checkpoint to Load
+    parser.add_argument('--exptype', type=str, default='testing', help='experiment folder name')
+    parser.add_argument('--ckpt_path', type=str, default='None', help='checkpoint to resume training from')
+    parser.add_argument('--dev', type=int, default=0, help='which gpu device to use')
+
+    # Defining which model and model version to use
+    parser.add_argument('--model', type=str, default='node', help='choice of latent dynamics function')
+    parser.add_argument('--system_identification', type=bool, default=True,
+                        help='whether to use (True) system identification or (False) state estimation model versions'
+                             'note that some baselines ignore this parameter and are fixed')
+    parser.add_argument('--stochastic', type=lambda x: bool(strtobool(x)), default=False,
+                        help='whether the dynamics parameters are stochastic')
+
+    # ODE Integration parameters
+    parser.add_argument('--integrator', type=str, default='rk4', help='which ODE integrator to use')
+    parser.add_argument('--integrator_params', dest="integrator_params",
+                        action=StoreDictKeyPair, default={'step_size': 0.5},
+                        help='ODE integrator options, set as --integrator_params key1=value1,key2=value2,...')
 
     # Dataset-to-use parameters
-    parser.add_argument('--dataset', type=str, default='pendulum', help='dataset name for training')
-    parser.add_argument('--dataset_ver', type=str, default='pendulum_50000samples_65steps',
-                        help='dataset version for training')
-    parser.add_argument('--dataset_size', type=int, default=5000, help='dataset name for training')
+    parser.add_argument('--dataset', type=str, default='pendulum', help='dataset folder name')
+    parser.add_argument('--dataset_ver', type=str, default='pendulum_12500samples_200steps_dt01',
+                        help='dataset version')
+    parser.add_argument('--dataset_percent', type=int, default=1.0, help='percent of dataset to use')
+    parser.add_argument('--batches_to_save', type=int, default=25, help='how many batches to output per epoch')
+
+    # Learning parameters
+    parser.add_argument('--num_epochs', type=int, default=249, help='number of epochs to run')
+    parser.add_argument('--batch_size', type=int, default=32, help='size of batch')
+    parser.add_argument('--learning_rate', type=float, default=1e-3, help='initial learning rate')
 
     # Tuning parameters
-    parser.add_argument('--z0_beta', type=float, default=0.1, help='multiplier for z0 term in loss')
-    parser.add_argument('--kl_beta', type=float, default=0.001, help='multiplier for encoder kl terms in loss')
+    parser.add_argument('--z0_beta', type=float, default=0.01, help='multiplier for z0 term in loss')
+    parser.add_argument('--kl_beta', type=float, default=0.001, help='multiplier for dynamic specific kl terms in loss')
 
     # Input dimensions
     parser.add_argument('--dim', type=int, default=32, help='dimension of the image data')
 
-    # Convolutional dimensions
-    parser.add_argument('--z_amort', type=int, default=5, help='how many X samples to use in z0 inference')
+    # Network dimensions
+    parser.add_argument('--latent_dim', type=int, default=32, help='latent dimension size')
+    parser.add_argument('--latent_act', type=str, default="swish", help='type of act func in dynamics func')
+    parser.add_argument('--num_layers', type=int, default=4, help='number of layers in the dynamics func')
+    parser.add_argument('--num_hidden', type=int, default=256, help='number of nodes per layer in dynamics func')
+    parser.add_argument('--num_filt', type=int, default=16, help='number of filters in the CNNs')
 
-    # Timesteps of generation
-    parser.add_argument('--generation_len', type=int, default=65, help='total length to generate')
+    # Z0 inference parameters
+    parser.add_argument('--z_amort', type=int, default=5, help='how many true frames to use in z0 inference')
+
+    # Timesteps to generate out
+    parser.add_argument('--generation_len', type=int, default=15, help='total length to generate (including z_amort)')
+    parser.add_argument('--generation_varying', type=lambda x: bool(strtobool(x)),
+                        default=True, help='whether to vary the generation_len/batch')
+    parser.add_argument('--generation_validation_len', type=int, default=30,
+                        help='total length to generate for validation')
     return parser
 
 
 def train_model(configs, args, num_epochs):
     # Define metrics of interest
-    metrics = {"val_loss": "val_likelihood", "val_vpt": "val_vpt", "val_mse": "val_pixel_mse", "val_dst": "val_dst",
-               "val_r2_0": "val_r2_0", "val_r2_1": "val_r2_1", "val_r2_2": "val_r2_2"}
+    metrics = {"val_loss": "val_likelihood", "val_vpt": "val_vpt", "val_mse": "val_pixel_mse", "val_dst": "val_dst"}
 
     # Given this config, set the parser arguments
     # Gross solution but easier to adjust just the tuning side to the general system architecture

@@ -12,7 +12,7 @@ import pytorch_lightning
 
 from distutils.util import strtobool
 from utils.dataloader import Dataset
-from utils.utils import get_exp_versions, get_model
+from utils.utils import get_exp_versions, get_model, StoreDictKeyPair
 
 
 def parse_args():
@@ -20,12 +20,16 @@ def parse_args():
     parser = argparse.ArgumentParser()
 
     # Experiment ID and Checkpoint to Load
-    parser.add_argument('--exptype', type=str, default='node_pendulum_cosineannealing', help='experiment folder name')
-    parser.add_argument('--ckpt_path', type=str, default='experiments/node_pendulum_systemidentification/node/version_5/',
+    parser.add_argument('--exptype', type=str, default='testing', help='experiment folder name')
+    parser.add_argument('--ckpt_path', type=str, default='experiments/testing/node/version_1',
                         help='path to the checkpoints folder')
     parser.add_argument('--checkpt', type=str, default='None',
                         help='name a specific checkpoint, will use the last one if none given')
     parser.add_argument('--dev', type=int, default=0, help='which gpu device to use')
+
+    # Whether to save output files (useful for visualizations, not great for storage space)
+    parser.add_argument('--save_files', type=lambda x: bool(strtobool(x)), default=False,
+                        help='whether to save dataset files in testing experiments')
 
     # Defining which model and model version to use
     parser.add_argument('--model', type=str, default='node', help='choice of latent dynamics function')
@@ -34,6 +38,12 @@ def parse_args():
                              'note that some baselines ignore this parameter and are fixed')
     parser.add_argument('--stochastic', type=lambda x: bool(strtobool(x)), default=False,
                         help='whether the dynamics parameters are stochastic')
+
+    # ODE Integration parameters
+    parser.add_argument('--integrator', type=str, default='rk4', help='which ODE integrator to use')
+    parser.add_argument('--integrator_params', dest="integrator_params",
+                        action=StoreDictKeyPair, default={'step_size': 0.5},
+                        help='ODE integrator options, set as --integrator_params key1=value1,key2=value2,...')
 
     # Dataset-to-use parameters
     parser.add_argument('--dataset', type=str, default='pendulum', help='dataset folder name')

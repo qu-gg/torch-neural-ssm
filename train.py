@@ -44,9 +44,12 @@ def parse_args():
     parser.add_argument('--batches_to_save', type=int, default=25, help='how many batches to output per epoch')
 
     # Learning parameters
-    parser.add_argument('--num_epochs', type=int, default=249, help='number of epochs to run')
+    parser.add_argument('--num_epochs', type=int, default=100, help='number of epochs to run')
     parser.add_argument('--batch_size', type=int, default=32, help='size of batch')
+
+    # Learning rate parameters
     parser.add_argument('--learning_rate', type=float, default=1e-3, help='initial learning rate')
+    parser.add_argument('--restart_interval', type=float, default=100 * 325, help='how many steps inbetween every warm restart')
 
     # Tuning parameters
     parser.add_argument('--z0_beta', type=float, default=0.01, help='multiplier for z0 term in loss')
@@ -56,11 +59,11 @@ def parse_args():
     parser.add_argument('--dim', type=int, default=32, help='dimension of the image data')
 
     # Network dimensions
-    parser.add_argument('--latent_dim', type=int, default=32, help='latent dimension size')
+    parser.add_argument('--latent_dim', type=int, default=8, help='latent dimension size')
     parser.add_argument('--latent_act', type=str, default="swish", help='type of act func in dynamics func')
-    parser.add_argument('--num_layers', type=int, default=4, help='number of layers in the dynamics func')
-    parser.add_argument('--num_hidden', type=int, default=256, help='number of nodes per layer in dynamics func')
-    parser.add_argument('--num_filt', type=int, default=16, help='number of filters in the CNNs')
+    parser.add_argument('--num_layers', type=int, default=2, help='number of layers in the dynamics func')
+    parser.add_argument('--num_hidden', type=int, default=128, help='number of nodes per layer in dynamics func')
+    parser.add_argument('--num_filt', type=int, default=8, help='number of filters in the CNNs')
 
     # Z0 inference parameters
     parser.add_argument('--z_amort', type=int, default=5, help='how many true frames to use in z0 inference')
