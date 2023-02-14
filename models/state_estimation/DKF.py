@@ -369,16 +369,15 @@ class DKF(LatentDynamicsModel):
         self.mu_ps, self.var_ps = mu_ps, var_ps
         return z_, mu_qs, var_qs, mu_ps, var_ps
 
-    def forward(self, x):
-        T = x.size(1)
+    def forward(self, x, generation_len):
         batch_size = x.size(0)
 
-        x = x.view(batch_size, T, -1)
+        x = x.view(batch_size, generation_len, -1)
         x = self.embedding(x)
         x_rnn = self.encoder(x)
 
-        z_, mu_qs, var_qs, mu_ps, var_ps = self.latent_dynamics(T, x_rnn)
-        x_ = self.decoder(z_.view(batch_size * T, -1))
+        z_, mu_qs, var_qs, mu_ps, var_ps = self.latent_dynamics(generation_len, x_rnn)
+        x_ = self.decoder(z_.view(batch_size * generation_len, -1))
         return x_, z_
 
     def model_specific_loss(self, *args, train=True):

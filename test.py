@@ -10,6 +10,7 @@ import torch
 import argparse
 import pytorch_lightning
 
+from distutils.util import strtobool
 from utils.dataloader import Dataset
 from utils.utils import get_exp_versions, get_model
 
@@ -31,6 +32,8 @@ def parse_args():
     parser.add_argument('--system_identification', type=bool, default=True,
                         help='whether to use (True) system identification or (False) state estimation model versions'
                              'note that some baselines ignore this parameter and are fixed')
+    parser.add_argument('--stochastic', type=lambda x: bool(strtobool(x)), default=False,
+                        help='whether the dynamics parameters are stochastic')
 
     # Dataset-to-use parameters
     parser.add_argument('--dataset', type=str, default='pendulum', help='dataset folder name')

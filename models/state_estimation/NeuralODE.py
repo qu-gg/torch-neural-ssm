@@ -50,19 +50,15 @@ class NeuralODE(LatentDynamicsModel):
         # Correction cell
         self.correction = nn.GRUCell(input_size=args.latent_dim, hidden_size=args.latent_dim)
 
-    def forward(self, x, **kwargs):
+    def forward(self, x, generation_len):
         """
         Forward function of the network that handles locally embedding the given sample into the C codes,
         generating the z posterior that defines mixture weightings, and finding the winning components for
         each sample
         :param x: data observation, which is a timeseries [BS, Timesteps, N Channels, Dim1, Dim2]
         """
-        # Reshape images to combine generation_len and channels
-        generation_len = x.shape[1]
-
         # Sample z_init
         z_init = self.encoder(x)
-        # z_init = torch.zeros(x.shape[0], self.args.latent_dim).to(self.device)
 
         # Evaluate model forward over T to get L latent reconstructions
         t = torch.linspace(1, generation_len - 1, generation_len - 1).to(self.device)

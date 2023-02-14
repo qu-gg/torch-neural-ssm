@@ -30,7 +30,7 @@ class LSTM_SE(LatentDynamicsModel):
         # Correction cell
         self.correction = nn.GRUCell(input_size=args.latent_dim, hidden_size=args.latent_dim)
 
-    def forward(self, x):
+    def forward(self, x, generation_len):
         """
         Forward function of the RGN SSM model
         :param x: data observation, which is a timeseries [BS, Timesteps, N Channels, Dim1, Dim2]

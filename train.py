@@ -19,7 +19,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
 
     # Experiment ID and Checkpoint to Load
-    parser.add_argument('--exptype', type=str, default='cosine_annealing_LRdecay', help='experiment folder name')
+    parser.add_argument('--exptype', type=str, default='testing', help='experiment folder name')
     parser.add_argument('--ckpt_path', type=str, default='None', help='checkpoint to resume training from')
     parser.add_argument('--dev', type=int, default=0, help='which gpu device to use')
 

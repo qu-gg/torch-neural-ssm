@@ -22,9 +22,9 @@ class FakeEncoder(nn.Module):
 
 
 class VRNN(LatentDynamicsModel):
-    def __init__(self, args, top, exptop, last_train_idx):
+    def __init__(self, args, top, exptop):
         """ Latent dynamics as parameterized by a global deterministic neural ODE """
-        super().__init__(args, top, exptop, last_train_idx)
+        super().__init__(args, top, exptop)
 
         self.encoder = FakeEncoder(args)
 
@@ -177,32 +177,39 @@ class VRNN(LatentDynamicsModel):
         _, (h_tp1, c_tp1) = self.rnn(rnn_input, (h_t, c_t))
         return h_tp1, c_tp1
 
-    def forward(self, x):
-        # Input is an image so reduce down to [batch_size, flattened_dim, seq_len]
-        x = x.reshape(x.shape[0], x.shape[1], -1)
-        x = x.permute(1, 0, 2)
-        seq_len = x.shape[0]
-        batch_size = x.shape[1]
+    def forward(self, x, generation_len):
+        batch_size = x.shape[0]
+        seq_len = generation_len
 
-        # create variable holder and send to GPU if needed
+        # Input is an image so reduce down to [batch_size, seq_len, flattened_dim]
+        x = x.reshape(x.shape[0], x.shape[1], -1)
+
+        # Permute it to [seq_len, batch_size, flattened_dim]
+        x = x.permute(1, 0, 2)
+
+        # Create variable holder and send to GPU if needed
         self.z_mean = torch.zeros((seq_len, batch_size, self.z_dim)).to(self.args.gpus[0])
         self.z_logvar = torch.zeros((seq_len, batch_size, self.z_dim)).to(self.args.gpus[0])
         y = torch.zeros((seq_len, batch_size, self.y_dim)).to(self.args.gpus[0])
         self.z = torch.zeros((seq_len, batch_size, self.z_dim)).to(self.args.gpus[0])
         h = torch.zeros((seq_len, batch_size, self.dim_RNN)).to(self.args.gpus[0])
-        z_t = torch.zeros(batch_size, self.z_dim).to(self.args.gpus[0])
         h_t = torch.zeros(self.num_RNN, batch_size, self.dim_RNN).to(self.args.gpus[0])
         c_t = torch.zeros(self.num_RNN, batch_size, self.dim_RNN).to(self.args.gpus[0])
 
-        # main part
-        feature_x_obs = self.feature_extractor_x(x)
-        for t in range(seq_len):
-            feature_xt = feature_x_obs[t, :, :].unsqueeze(0)
+        # For the observed frames, use real input; otherwise use previous generated frame
+        feature_x_obs = self.feature_extractor_x(x[:self.args.z_amort])
+        for t in range(generation_len):
+            if t < self.args.z_amort:
+                feature_xt = feature_x_obs[t, :, :].unsqueeze(0)
+            else:
+                feature_xt = self.feature_extractor_x(y_prev)
+
             h_t_last = h_t.view(self.num_RNN, 1, batch_size, self.dim_RNN)[-1, :, :, :]
             mean_zt, logvar_zt = self.inference(feature_xt, h_t_last)
             z_t = self.reparameterization(mean_zt, logvar_zt)
             feature_zt = self.feature_extractor_z(z_t)
             y_t = self.generation_x(feature_zt, h_t_last)
+            y_prev = y_t.detach()
             self.z_mean[t, :, :] = mean_zt
             self.z_logvar[t, :, :] = logvar_zt
             self.z[t, :, :] = torch.squeeze(z_t)
@@ -217,7 +224,7 @@ class VRNN(LatentDynamicsModel):
         embeddings = self.z.permute(1, 0, 2)
         return y, embeddings
 
-    def model_specific_loss(self, x, x_rec, zts, train=True):
+    def model_specific_loss(self, x, x_rec, train=True):
         """ KL term between the parameter distribution w and a normal prior"""
         # Reshape to [BS, SL, LatentDim]
         z_mus = self.z_mean.permute(1, 0, 2).reshape([x.shape[0], -1])
@@ -229,10 +236,3 @@ class VRNN(LatentDynamicsModel):
         q = Normal(z_mus, torch.exp(0.5 * z_logvar))
         N = Normal(z_mus_prior, torch.exp(0.5 * z_logvar_prior))
         return kl(q, N).sum([-1]).mean()
-
-    @staticmethod
-    def add_model_specific_args(parent_parser):
-        """ Add the TRS regularization weight """
-        parser = parent_parser.add_argument_group("NODE_TR")
-        parser.add_argument('--trs_beta', type=float, default=100, help='multiplier for encoder kl terms in loss')
-        return parent_parser
