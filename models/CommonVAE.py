@@ -102,6 +102,8 @@ class EmissionDecoder(nn.Module):
         self.decoder = nn.Sequential(
             # Transform latent vector into 4D tensor for deconvolution
             nn.Linear(latent_dim, self.conv_dim),
+            nn.BatchNorm1d(self.conv_dim),
+            nn.LeakyReLU(),
             UnFlatten(4),
 
             # Perform de-conv to output space

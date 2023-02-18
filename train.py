@@ -19,7 +19,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
 
     # Experiment ID and Checkpoint to Load
-    parser.add_argument('--exptype', type=str, default='testing', help='experiment folder name')
+    parser.add_argument('--exptype', type=str, default='testing_optimizations', help='experiment folder name')
     parser.add_argument('--ckpt_path', type=str, default='None', help='checkpoint to resume training from')
     parser.add_argument('--dev', type=int, default=0, help='which gpu device to use')
 
@@ -70,8 +70,8 @@ def parse_args():
 
     # Timesteps to generate out
     parser.add_argument('--generation_len', type=int, default=15, help='total length to generate (including z_amort)')
-    parser.add_argument('--generation_varying', type=lambda x: bool(strtobool(x)),
-                        default=True, help='whether to vary the generation_len/batch')
+    parser.add_argument('--generation_varying', type=lambda x: bool(strtobool(x)), default=False,
+                        help='whether to vary the generation_len/batch')
     parser.add_argument('--generation_validation_len', type=int, default=30, help='total length to generate for validation')
     return parser
 
@@ -123,7 +123,10 @@ if __name__ == '__main__':
                                                            max_epochs=arg.num_epochs,
                                                            gradient_clip_val=5.0,
                                                            check_val_every_n_epoch=10,
-                                                           auto_select_gpus=True, reload_dataloaders_every_n_epochs=10)
+                                                           num_sanity_val_steps=0,
+                                                           auto_select_gpus=True
+    )
+
     # Start training from scratch or a checkpoint
     if arg.ckpt_path == 'None':
         trainer.fit(model, dataset)

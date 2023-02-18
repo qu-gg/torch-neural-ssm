@@ -83,7 +83,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
                                                                         T_0=self.args.restart_interval,
                                                                         T_mult=1,
                                                                         eta_min=self.args.learning_rate * 1e-2,
-                                                                        warmup_steps=600, decay=0.90)
+                                                                        warmup_steps=20, decay=0.90)
 
         # Explicit dictionary to state how often to ping the scheduler
         scheduler = {
@@ -119,18 +119,6 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         }
         with open(f"{self.version_path}/params.json", 'w') as f:
             json.dump(params, f)
-
-        # Make image dir in lightning experiment folder if it doesn't exist
-        if not os.path.exists(f"{self.version_path}/images/"):
-            os.mkdir(f"{self.version_path}/images/")
-
-    def on_validation_start(self):
-        """
-        Extra check to make sure the version path variable is set when restarting from a given checkpoint.
-        Sometimes it can start on a reconstruction-based epoch and cause errors without this check.
-        """
-        # Get local version path from absolute directory
-        self.version_path = f"{os.path.abspath('')}/lightning_logs/version_{self.top}/"
 
         # Make image dir in lightning experiment folder if it doesn't exist
         if not os.path.exists(f"{self.version_path}/images/"):
@@ -183,6 +171,41 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         dynamics_loss = self.model_specific_loss(images, preds)
         return likelihood, klz, dynamics_loss
 
+    def get_epoch_metrics(self, outputs):
+        """
+        Takes the dictionary of saved batch metrics, stacks them, and gets outputs to log in the Tensorboard.
+        TODO: make an argument parse that takes in a list of metric functions to iterate over rather than hard
+        TODO: calling each function here; not dataset-agnostic
+        :param outputs: list of dictionaries with outputs from each back
+        :return: dictionary of metrics aggregated over the epoch
+        """
+        # Convert to stacked numpy arrays
+        images, preds = [], []
+        for out in outputs:
+            images.append(out["images"])
+            preds.append(out["preds"])
+        images = torch.vstack(images)
+        preds = torch.vstack(preds)
+
+        # Get pixel MSEs
+        out_recon_mse = self.reconstruction_loss(preds[:, :self.args.generation_len],
+                                                 images[:, :self.args.generation_len]).mean([1, 2, 3]).mean()
+
+        # Get extrapolation metrics
+        if self.args.generation_validation_len > self.args.generation_len:
+            out_extrapolation_mse = self.reconstruction_loss(preds[:, self.args.generation_len:],
+                                                             images[:, self.args.generation_len:]).mean([1, 2, 3]).mean()
+
+        # Get metrics
+        images = images.cpu().numpy()
+        preds = preds.cpu().numpy()
+        out_vpt = vpt(images, preds)[0]
+        out_dst = dst(images, preds)[1]
+        out_vpd = vpd(images, preds)[1]
+
+        # Return a dictionary of metrics
+        return {"vpt": out_vpt, "dst": out_dst, "vpd": out_vpd, "recon_mse": out_recon_mse, "extrapolation_mse": out_extrapolation_mse}
+
     def training_step(self, batch, batch_idx):
         """
         PyTorch-Lightning training step where the network is propagated and returns a single loss value,
@@ -203,12 +226,6 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         self.log("likelihood", likelihood, prog_bar=True)
         self.log("klz_loss", klz, prog_bar=True)
         self.log("dynamics_loss", dynamics_loss)
-
-        # Log various metrics
-        self.log("train_vpt", vpt(images, preds.detach())[0], prog_bar=True, on_epoch=True, on_step=False)
-        self.log("train_pixel_mse", self.reconstruction_loss(preds, images).mean([1, 2, 3]).mean(), prog_bar=True, on_step=True)
-        self.log("train_dst", dst(images, preds.detach())[1], prog_bar=True, on_epoch=True, on_step=False)
-        self.log("train_vpd", vpd(images, preds.detach())[1], prog_bar=True, on_epoch=True, on_step=False)
         self.log("learning_rate", self.optimizers().param_groups[0]['lr'], prog_bar=False, on_step=True)
 
         # Determine KL annealing factor for the current step
@@ -231,6 +248,12 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         # Every 4 epochs, get a reconstruction example, model-specific plots, and copy over to the experiments folder
         :param outputs: list of outputs from the training steps, with the last 25 steps having reconstructions
         """
+        # Log epoch metrics on saved batches
+        metrics = self.get_epoch_metrics(outputs[:self.args.batches_to_save])
+        for metric in metrics.keys():
+            self.log(f"train_{metric}", metrics[metric], prog_bar=True)
+
+        # Only log images every 10 epochs
         if self.current_epoch % 10 != 0:
             return
 
@@ -262,28 +285,13 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
 
         # Log validation likelihood and metrics
         self.log("val_likelihood", likelihood, prog_bar=True)
-        self.log("val_vpt", vpt(images, preds.detach())[0], prog_bar=True, on_epoch=True, on_step=False)
-        self.log("val_dst", dst(images, preds.detach())[1], prog_bar=True, on_epoch=True, on_step=False)
-        self.log("val_vpd", vpd(images, preds.detach())[1], prog_bar=True, on_epoch=True, on_step=False)
-
-        # Get extrapolation metrics if validation generation is longer than training
-        if self.args.generation_validation_len > self.args.generation_len:
-            self.log("val_mse_recon", self.reconstruction_loss(preds[:, :self.args.generation_len],
-                                                               images[:, :self.args.generation_len]).mean([1, 2, 3]).mean(),
-                     prog_bar=True, on_epoch=True, on_step=False)
-            self.log("val_mse_extrapolation", self.reconstruction_loss(preds[:, self.args.generation_len:],
-                                                                       images[:, self.args.generation_len:]).mean([1, 2, 3]).mean(),
-                     prog_bar=True, on_epoch=True, on_step=False)
-        else:
-            self.log("val_mse_recon", self.reconstruction_loss(preds, images).mean([1, 2, 3]).mean(),
-                     prog_bar=True, on_epoch=True, on_step=False)
 
         # Build the full loss
         loss = likelihood + dynamics_loss
 
         # Return outputs as dict
         out = {"loss": loss}
-        if batch_idx == 0:
+        if batch_idx < self.args.batches_to_save:
             out["preds"] = preds.detach()
             out["images"] = images.detach()
         return out
@@ -293,6 +301,12 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         Every N epochs, get a validation reconstruction sample
         :param outputs: list of outputs from the validation steps at batch 0
         """
+        # Log epoch metrics on saved batches
+        metrics = self.get_epoch_metrics(outputs[:self.args.batches_to_save])
+        for metric in metrics.keys():
+            self.log(f"val_{metric}", metrics[metric], prog_bar=True)
+
+        # Get image reconstructions
         show_images(outputs[0]["images"], outputs[0]["preds"],
                     f'{self.version_path}/images/recon{self.current_epoch}val.png', num_out=5)
 
