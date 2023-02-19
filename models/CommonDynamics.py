@@ -175,8 +175,6 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
     def get_epoch_metrics(self, outputs):
         """
         Takes the dictionary of saved batch metrics, stacks them, and gets outputs to log in the Tensorboard.
-        TODO: make an argument parse that takes in a list of metric functions to iterate over rather than hard
-        TODO: calling each function here; not dataset-agnostic
         :param outputs: list of dictionaries with outputs from each back
         :return: dictionary of metrics aggregated over the epoch
         """
@@ -307,17 +305,9 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         # TODO - Output N runs per batch to get averaged metrics rather than one run
         images, states, labels, preds, embeddings = self.get_step_outputs(batch, self.args.generation_len)
 
-        pixel_mse_recon = self.reconstruction_loss(preds, images).mean([1, 2, 3])
-        test_vpt = vpt(images, preds.detach())[0]
-        test_dst = dst(images, preds.detach())[1]
-        test_vpd = vpd(images, preds.detach())[1]
-
         # Build output dictionary
-        out = {"states": states.detach().cpu().numpy(), "embeddings": embeddings.detach().cpu().numpy(),
-               "preds": preds.detach().cpu().numpy(), "images": images.detach().cpu().numpy(),
-               "labels": labels.detach().cpu().numpy(),
-               "pixel_mse_recon": pixel_mse_recon.detach().cpu().numpy(),
-               "vpt": test_vpt, "dst": test_dst, "vpd": test_vpd}
+        out = {"states": states.detach(), "embeddings": embeddings.detach(),
+               "preds": preds.detach(), "images": images.detach(), "labels": labels.detach()}
         return out
 
     @torch.no_grad()
@@ -328,7 +318,6 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         """
         # Stack all outputs
         preds, images, states, embeddings, labels = [], [], [], [], []
-        mse_recons, vpts, dsts, vpds = [], [], [], []
         for output in outputs:
             preds.append(output["preds"])
             images.append(output["images"])
@@ -336,52 +325,20 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
             labels.append(output["labels"])
             embeddings.append(output["embeddings"])
 
-            mse_recons.append(output["pixel_mse_recon"])
-            vpts.append(output["vpt"])
-            dsts.append(output["dst"])
-            vpds.append(output["vpd"])
-
-        preds = np.vstack(preds)
-        images = np.vstack(images)
-        states = np.vstack(states)
-        embeddings = np.vstack(embeddings)
-        labels = np.vstack(labels)
-
-        pixel_mse = np.vstack(mse_recons)
-        vpts = np.vstack(vpts)
-        dsts = np.vstack(dsts)
-        vpds = np.vstack(vpds)
+        preds = torch.vstack(preds).cpu().numpy()
+        images = torch.vstack(images).cpu().numpy()
+        states = torch.vstack(states).cpu().numpy()
+        embeddings = torch.vstack(embeddings).cpu().numpy()
+        labels = torch.vstack(labels).cpu().numpy()
         del outputs
 
-        # Print statistics over the full set
-        print("")
-        print(f"=> Pixel Recon MSE: {np.mean(pixel_mse):4.5f}+-{np.std(pixel_mse):4.5f}")
-        print(f"=> VPT:       {np.mean(vpts):4.5f}+-{np.std(vpts):4.5f}")
-        print(f"=> DST:       {np.mean(dsts):4.5f}+-{np.std(dsts):4.5f}")
-        print(f"=> VPD:       {np.mean(vpds):4.5f}+-{np.std(vpds):4.5f}")
-
-        metrics = {
-            "pixel_mse_mean": float(np.mean(pixel_mse)),
-            "pixel_mse_std": float(np.std(pixel_mse)),
-            "vpt_mean": float(np.mean(vpts)),
-            "vpt_std": float(np.std(vpts)),
-            "dst_mean": float(np.mean(dsts)),
-            "dst_std": float(np.std(dsts)),
-            "vpd_mean": float(np.mean(vpds)),
-            "vpd_std": float(np.std(vpds))
-        }
-
-        # # Get polar coordinates (sin and cos) of the angle for evaluation
-        # sins = np.sin(states[:, :, 0])
-        # coss = np.cos(states[:, :, 0])
-        # states = np.stack((sins, coss, states[:, :, 1]), axis=2)
-        #
-        # # Get r2 score
-        # r2s = r2fit(embeddings, states, mlp=True)
-
-        # # Log each dimension's R2 individually
-        # for idx, r in enumerate(r2s):
-        #     metrics[f"r2_{idx}"] = r
+        # Iterate through each metric function and add to a dictionary
+        out_metrics = {}
+        for met in self.args.metrics:
+            metric_function = getattr(metrics, met)
+            metric_mean, metric_std = metric_function(images, preds, args=self.args)
+            out_metrics[f"{met}_mean"], out_metrics[f"{met}_std"] = float(metric_mean), float(metric_std)
+            print(f"=> {met}: {metric_mean:4.5f}+-{metric_std:4.5f}")
 
         # Set up output path and create dir
         output_path = f"{self.args.ckpt_path}/test_{self.args.dataset}"
@@ -390,7 +347,6 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
 
         # Save files
         if self.args.save_files is True:
-            np.save(f"{output_path}/test_{self.args.dataset}_pixelmse.npy", pixel_mse)
             np.save(f"{output_path}/test_{self.args.dataset}_recons.npy", preds)
             np.save(f"{output_path}/test_{self.args.dataset}_images.npy", images)
             np.save(f"{output_path}/test_{self.args.dataset}_labels.npy", labels)
@@ -422,16 +378,9 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
 
         # Save metrics to JSON in checkpoint folder
         with open(f"{output_path}/test_{self.args.dataset}_metrics.json", 'w') as f:
-            json.dump(metrics, f)
+            json.dump(out_metrics, f)
 
         # Save metrics to an easy excel conversion style
         with open(f"{output_path}/test_{self.args.dataset}_excel.txt", 'w') as f:
-            f.write(f"{metrics['pixel_mse_mean']},{metrics['pixel_mse_std']},{metrics['vpt_mean']},{metrics['vpt_std']},"
-                    f"{metrics['dst_mean']},{metrics['dst_std']},{metrics['vpd_mean']},{metrics['vpd_std']}")
-
-        # Save metrics to an easy excel conversion style
-        with open(f"{output_path}/test_{self.args.dataset}_excel.txt", 'w') as f:
-            f.write(f"{metrics['pixel_mse_mean']:0.3f}({metrics['pixel_mse_std']:0.3f}),"
-                    f"{metrics['vpt_mean']:0.3f}({metrics['vpt_std']:0.3f}),"
-                    f"{metrics['dst_mean']:0.3f}({metrics['dst_std']:0.3f}),"
-                    f"{metrics['vpd_mean']:0.3f}({metrics['vpd_std']:0.3f})")
+            for metric in self.args.metrics:
+                f.write(f"{out_metrics[f'{metric}_mean']:0.3f}({out_metrics[f'{metric}_std']:0.3f}),")

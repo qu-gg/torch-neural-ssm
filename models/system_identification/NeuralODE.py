@@ -56,7 +56,7 @@ class NeuralODE(LatentDynamicsModel):
 
         # Perform the integration with the Neural ODE.
         # Depending on choice of integrator, different packages need to be used (i.e. symplectic is not in torchdiffeq)
-        if self.args.integrator == 'sym12async':
+        if self.args.integrator == 'symplectic':
             # configure training options
             options = {'method': 'sym12async', 'h': None, 't0': 0.0, 't1': generation_len - 1, 't_eval': t,
                        'rtol': 1e-2, 'atol': 1e-4, 'print_neval': False, 'neval_max': 1000000, 'safety': None,

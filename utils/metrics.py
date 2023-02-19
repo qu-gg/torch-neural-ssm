@@ -120,10 +120,10 @@ def dst(gt, preds, **kwargs):
             # Add to result
             results[n, t] = dist
 
-    return np.mean(results), np.std(results), results
+    return np.mean(results), np.std(results)
 
 
-def vpd(output, target, **kwargs):
+def vpd(target, output, epsilon=10, **kwargs):
     """
     Computes the Valid Prediction Time metric, as proposed in https://openreview.net/forum?id=7C9aRX2nBf2
     VPD = argmin_t [DST(gt, pred) > epsilon]
@@ -131,8 +131,51 @@ def vpd(output, target, **kwargs):
     :param preds: model predicted sequences
     :param epsilon: threshold for valid prediction
     """
-    epsilon = 10
-    _, _, dsts = dst(output, target)
+    # Ensure on CPU and numpy
+    if not isinstance(output, np.ndarray):
+        output = output.cpu().numpy()
+        target = target.cpu().numpy()
+
+    # Get shapes
+    num_samples, timesteps, height, width = target.shape
+
+    # Apply Otsu thresholding function on output
+    preds, gt = thresholding(output, target)
+
+    # Loop over each sample and timestep to get the distance metric
+    dsts = np.zeros([num_samples, timesteps])
+    for n in range(num_samples):
+        for t in range(timesteps):
+            # Get all active predicted pixels
+            a = preds[n, t]
+            b = gt[n, t]
+            pos_a = np.where(a == 1)
+            pos_b = np.where(b == 1)
+
+            # If there are in gt, add 0
+            if pos_b[0].shape[0] == 0:
+                results[n, t] = 0
+                continue
+
+            # Get gt center
+            center_b = np.array([pos_b[0].mean(), pos_b[1].mean()])
+
+            # Get center of predictions
+            if pos_a[0].shape[0] != 0:
+                center_a = np.array([pos_a[0].mean(), pos_a[1].mean()])
+            # If no pixels above threshold, add the highest possible error in image space
+            else:
+                results[n, t] = np.sqrt(np.sum(np.array([height, width]) ** 2))
+                continue
+
+            # Get distance metric
+            dist = np.sum((center_a - center_b) ** 2)
+            dist = np.sqrt(dist)
+
+            # Add to result
+            dsts[n, t] = dist
+
+    # Get the VPD calculation
     B, T = dsts.shape
     vpdist = np.zeros(B)
     for i in range(B):
@@ -171,7 +214,10 @@ def r2fit(latents, gt_state, mlp=False):
     :param gt_state: ground truth physical parameters [BatchSize, TimeSteps, StateSize]
     :param mlp: whether to use a non-linear MLP regressor instead of linear regression
     """
-    r2s = []
+    # Get first dimension of states for evaluation
+    sins = np.sin(gt_state[:, :, 0])
+    coss = np.cos(gt_state[:, :, 0])
+    gt_states = np.stack((sins, coss, gt_state[:, :, 1]), axis=2)
 
     # Ensure on CPU and numpy
     if not isinstance(latents, np.ndarray):
@@ -183,6 +229,7 @@ def r2fit(latents, gt_state, mlp=False):
     gt_state = gt_state.reshape([gt_state.shape[0] * gt_state.shape[1], -1])
 
     # For each dimension of gt_state, get the R^2 value
+    r2s = []
     for sidx in range(gt_state.shape[-1]):
         gts = gt_state[:, sidx]
 

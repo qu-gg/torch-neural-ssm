@@ -37,7 +37,7 @@ def parse_args():
                         help='which metrics to use')
 
     # ODE Integration parameters
-    parser.add_argument('--integrator', type=str, default='rk4', help='which ODE integrator to use')
+    parser.add_argument('--integrator', type=str, default='symplectic', help='which ODE integrator to use')
     parser.add_argument('--integrator_params', dest="integrator_params",
                         action=StoreDictKeyPair, default={'step_size': 0.5},
                         help='ODE integrator options, set as --integrator_params key1=value1,key2=value2,...')
@@ -64,7 +64,7 @@ def parse_args():
     parser.add_argument('--dim', type=int, default=32, help='dimension of the image data')
 
     # Network dimensions
-    parser.add_argument('--latent_dim', type=int, default=8, help='latent dimension size')
+    parser.add_argument('--latent_dim', type=int, default=3, help='latent dimension size')
     parser.add_argument('--latent_act', type=str, default="swish", help='type of act func in dynamics func')
     parser.add_argument('--num_layers', type=int, default=2, help='number of layers in the dynamics func')
     parser.add_argument('--num_hidden', type=int, default=128, help='number of nodes per layer in dynamics func')

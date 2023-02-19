@@ -21,7 +21,7 @@ def parse_args():
 
     # Experiment ID and Checkpoint to Load
     parser.add_argument('--exptype', type=str, default='testing', help='experiment folder name')
-    parser.add_argument('--ckpt_path', type=str, default='experiments/testing/node/version_1',
+    parser.add_argument('--ckpt_path', type=str, default='lightning_logs/version_3',
                         help='path to the checkpoints folder')
     parser.add_argument('--checkpt', type=str, default='None',
                         help='name a specific checkpoint, will use the last one if none given')
@@ -30,6 +30,11 @@ def parse_args():
     # Whether to save output files (useful for visualizations, not great for storage space)
     parser.add_argument('--save_files', type=lambda x: bool(strtobool(x)), default=False,
                         help='whether to save dataset files in testing experiments')
+
+    # Metrics to evaluate on
+    parser.add_argument('--metrics', type=list,
+                        default=['vpt', 'dst', 'vpd', 'reconstruction_mse', 'extrapolation_mse'],
+                        help='which metrics to use')
 
     # Defining which model and model version to use
     parser.add_argument('--model', type=str, default='node', help='choice of latent dynamics function')
@@ -40,7 +45,7 @@ def parse_args():
                         help='whether the dynamics parameters are stochastic')
 
     # ODE Integration parameters
-    parser.add_argument('--integrator', type=str, default='rk4', help='which ODE integrator to use')
+    parser.add_argument('--integrator', type=str, default='symplectic', help='which ODE integrator to use')
     parser.add_argument('--integrator_params', dest="integrator_params",
                         action=StoreDictKeyPair, default={'step_size': 0.5},
                         help='ODE integrator options, set as --integrator_params key1=value1,key2=value2,...')
@@ -59,7 +64,7 @@ def parse_args():
 
     # Timesteps of generation
     parser.add_argument('--generation_len', type=int, default=90, help='total length to generate')
-    parser.add_argument('--training_len', type=int, default=1, help='total length to generate')
+    parser.add_argument('--training_len', type=int, default=15, help='total length to generate')
     return parser
 
 
@@ -80,7 +85,7 @@ if __name__ == '__main__':
     arg.gpus = [arg.dev]
 
     # Set a consistent seed over the full set for consistent analysis
-    pytorch_lightning.seed_everything(125125125)
+    pytorch_lightning.seed_everything(125125125, workers=True)
 
     # Build the checkpoint path and load it
     if arg.checkpt != "None":
@@ -108,7 +113,7 @@ if __name__ == '__main__':
     model = model_type(arg, top, exptop)
 
     # Initialize pytorch lighthning trainer
-    trainer = pytorch_lightning.Trainer.from_argparse_args(arg, max_epochs=1, auto_select_gpus=True)
+    trainer = pytorch_lightning.Trainer.from_argparse_args(arg, max_epochs=1, deterministic=True, auto_select_gpus=True)
 
     # Test model on the given set and checkpoint
     trainer.test(model, dataset, ckpt_path=ckpt_path)
