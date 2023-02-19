@@ -31,6 +31,11 @@ def parse_args():
     parser.add_argument('--stochastic', type=lambda x: bool(strtobool(x)), default=False,
                         help='whether the dynamics parameters are stochastic')
 
+    # Metrics to evaluate on
+    parser.add_argument('--metrics', type=list,
+                        default=['vpt', 'dst', 'vpd', 'reconstruction_mse', 'extrapolation_mse'],
+                        help='which metrics to use')
+
     # ODE Integration parameters
     parser.add_argument('--integrator', type=str, default='rk4', help='which ODE integrator to use')
     parser.add_argument('--integrator_params', dest="integrator_params",
@@ -93,7 +98,7 @@ if __name__ == '__main__':
     arg.gpus = [arg.dev]
 
     # Set a consistent seed over the full set for consistent analysis
-    pytorch_lightning.seed_everything(125125125)
+    pytorch_lightning.seed_everything(125125125, workers=True)
 
     # Get version numbers
     global top, exptop
@@ -106,8 +111,8 @@ if __name__ == '__main__':
     model = model_type(arg, top, exptop)
 
     # Callbacks for checkpointing and early stopping
-    checkpoint_callback = ModelCheckpoint(monitor='val_mse_recon',
-                                          filename='epoch{epoch:02d}-val_mse_recon{val_mse_recon:.4f}',
+    checkpoint_callback = ModelCheckpoint(monitor='val_reconstruction_mse',
+                                          filename='epoch{epoch:02d}-val_reconstruction_mse{val_reconstruction_mse:.4f}',
                                           auto_insert_metric_name=False, save_last=True)
     early_stop_callback = EarlyStopping(monitor="val_mse_recon", min_delta=0.0005, patience=10, mode="min")
     lr_monitor = LearningRateMonitor(logging_interval='step')
@@ -120,6 +125,7 @@ if __name__ == '__main__':
                                                                lr_monitor,
                                                                checkpoint_callback
                                                            ],
+                                                           deterministic=True,
                                                            max_epochs=arg.num_epochs,
                                                            gradient_clip_val=5.0,
                                                            check_val_every_n_epoch=10,
@@ -131,7 +137,5 @@ if __name__ == '__main__':
     if arg.ckpt_path == 'None':
         trainer.fit(model, dataset)
     else:
-        trainer.fit(
-            model, dataset,
-            ckpt_path=f"{arg.ckpt_path}/checkpoints/{os.listdir(f'{arg.ckpt_path}/checkpoints/')[-1]}"
-        )
+        trainer.fit(model, dataset,
+                    ckpt_path=f"{arg.ckpt_path}/checkpoints/{os.listdir(f'{arg.ckpt_path}/checkpoints/')[-1]}")

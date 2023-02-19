@@ -11,6 +11,7 @@ import shutil
 import numpy as np
 import torch.nn as nn
 import pytorch_lightning
+import utils.metrics as metrics
 import matplotlib.pyplot as plt
 
 from sklearn.manifold import TSNE
@@ -179,32 +180,18 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         :param outputs: list of dictionaries with outputs from each back
         :return: dictionary of metrics aggregated over the epoch
         """
-        # Convert to stacked numpy arrays
-        images, preds = [], []
-        for out in outputs:
-            images.append(out["images"])
-            preds.append(out["preds"])
-        images = torch.vstack(images)
-        preds = torch.vstack(preds)
+        # Convert outputs to Tensors and then Numpy arrays
+        images = torch.vstack([out["images"] for out in outputs]).cpu().numpy()
+        preds = torch.vstack([out["preds"] for out in outputs]).cpu().numpy()
 
-        # Get pixel MSEs
-        out_recon_mse = self.reconstruction_loss(preds[:, :self.args.generation_len],
-                                                 images[:, :self.args.generation_len]).mean([1, 2, 3]).mean()
-
-        # Get extrapolation metrics
-        if self.args.generation_validation_len > self.args.generation_len:
-            out_extrapolation_mse = self.reconstruction_loss(preds[:, self.args.generation_len:],
-                                                             images[:, self.args.generation_len:]).mean([1, 2, 3]).mean()
-
-        # Get metrics
-        images = images.cpu().numpy()
-        preds = preds.cpu().numpy()
-        out_vpt = vpt(images, preds)[0]
-        out_dst = dst(images, preds)[1]
-        out_vpd = vpd(images, preds)[1]
+        # Iterate through each metric function and add to a dictionary
+        out_metrics = {}
+        for met in self.args.metrics:
+            metric_function = getattr(metrics, met)
+            out_metrics[met] = metric_function(images, preds, args=self.args)[0]
 
         # Return a dictionary of metrics
-        return {"vpt": out_vpt, "dst": out_dst, "vpd": out_vpd, "recon_mse": out_recon_mse, "extrapolation_mse": out_extrapolation_mse}
+        return out_metrics
 
     def training_step(self, batch, batch_idx):
         """
@@ -226,7 +213,6 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         self.log("likelihood", likelihood, prog_bar=True)
         self.log("klz_loss", klz, prog_bar=True)
         self.log("dynamics_loss", dynamics_loss)
-        self.log("learning_rate", self.optimizers().param_groups[0]['lr'], prog_bar=False, on_step=True)
 
         # Determine KL annealing factor for the current step
         kl_factor = determine_annealing_factor(self.n_updates, anneal_update=1000)

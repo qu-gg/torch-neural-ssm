@@ -13,7 +13,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.neural_network import MLPRegressor
 
 
-def vpt(gt, preds, epsilon=0.010):
+def vpt(gt, preds, epsilon=0.010, **kwargs):
     """
     Computes the Valid Prediction Time metric, as proposed in https://openreview.net/pdf?id=qBl8hnwR0px
     VPT = argmin_t [MSE(gt, pred) > epsilon]
@@ -69,7 +69,7 @@ def thresholding(preds, gt):
     return res, gt
 
 
-def dst(gt, preds):
+def dst(gt, preds, **kwargs):
     """
     Computes a Euclidean distance metric between the center of the ball in ground truth and prediction
     Activated pixels in the predicted are computed via Otsu's thresholding function
@@ -120,22 +120,47 @@ def dst(gt, preds):
             # Add to result
             results[n, t] = dist
 
-    return results, np.mean(results)
+    return np.mean(results), np.std(results), results
 
 
-def vpd(output, target):
+def vpd(output, target, **kwargs):
+    """
+    Computes the Valid Prediction Time metric, as proposed in https://openreview.net/forum?id=7C9aRX2nBf2
+    VPD = argmin_t [DST(gt, pred) > epsilon]
+    :param gt: ground truth sequences
+    :param preds: model predicted sequences
+    :param epsilon: threshold for valid prediction
+    """
     epsilon = 10
-    mses, _ = dst(output, target)
-    B, T = mses.shape
+    _, _, dsts = dst(output, target)
+    B, T = dsts.shape
     vpdist = np.zeros(B)
     for i in range(B):
-        idx = np.where(mses[i, :] >= epsilon)[0]
+        idx = np.where(dsts[i, :] >= epsilon)[0]
         if idx.shape[0] > 0:
             vpdist[i] = np.min(idx)
         else:
             vpdist[i] = T
-    vpdist = vpdist / T
-    return vpdist
+
+    # Return VPT mean over the total timesteps
+    return np.mean(vpdist) / T, np.std(vpdist) / T
+
+
+def reconstruction_mse(output, target, **kwargs):
+    """ Gets the mean of the per-pixel MSE for the given length of timesteps used for training """
+    full_pixel_mses = (output[:, :kwargs['args'].generation_len] - target[:, :kwargs['args'].generation_len]) ** 2
+    sequence_pixel_mse = np.mean(full_pixel_mses, axis=(1, 2, 3))
+    return np.mean(sequence_pixel_mse), np.std(sequence_pixel_mse)
+
+
+def extrapolation_mse(output, target, **kwargs):
+    """ Gets the mean of the per-pixel MSE for a number of steps past the length used in training """
+    full_pixel_mses = (output[:, kwargs['args'].generation_len:] - target[:, kwargs['args'].generation_len:]) ** 2
+    if full_pixel_mses.shape[1] == 0:
+        return 0.0, 0.0
+
+    sequence_pixel_mse = np.mean(full_pixel_mses, axis=(1, 2, 3))
+    return np.mean(sequence_pixel_mse), np.std(sequence_pixel_mse)
 
 
 def r2fit(latents, gt_state, mlp=False):
