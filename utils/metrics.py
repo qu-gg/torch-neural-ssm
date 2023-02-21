@@ -191,14 +191,14 @@ def vpd(target, output, epsilon=10, **kwargs):
 
 def reconstruction_mse(output, target, **kwargs):
     """ Gets the mean of the per-pixel MSE for the given length of timesteps used for training """
-    full_pixel_mses = (output[:, :kwargs['args'].generation_len] - target[:, :kwargs['args'].generation_len]) ** 2
+    full_pixel_mses = (output[:, :kwargs['args'].generation_training_len] - target[:, :kwargs['args'].generation_training_len]) ** 2
     sequence_pixel_mse = np.mean(full_pixel_mses, axis=(1, 2, 3))
     return np.mean(sequence_pixel_mse), np.std(sequence_pixel_mse)
 
 
 def extrapolation_mse(output, target, **kwargs):
     """ Gets the mean of the per-pixel MSE for a number of steps past the length used in training """
-    full_pixel_mses = (output[:, kwargs['args'].generation_len:] - target[:, kwargs['args'].generation_len:]) ** 2
+    full_pixel_mses = (output[:, kwargs['args'].generation_training_len:] - target[:, kwargs['args'].generation_training_len:]) ** 2
     if full_pixel_mses.shape[1] == 0:
         return 0.0, 0.0
 

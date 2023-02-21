@@ -357,10 +357,3 @@ class KVAE(LatentDynamicsModel):
         loss_lgssm = - log_paz_given_u + log_pz_given_au
         loss_tot = loss_vae + loss_lgssm
         return loss_vae + loss_lgssm + loss_tot
-
-    @staticmethod
-    def add_model_specific_args(parent_parser):
-        """ Add the TRS regularization weight """
-        parser = parent_parser.add_argument_group("NODE_TR")
-        parser.add_argument('--trs_beta', type=float, default=100, help='multiplier for encoder kl terms in loss')
-        return parent_parser

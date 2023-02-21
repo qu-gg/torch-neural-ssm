@@ -387,8 +387,8 @@ class DKF(LatentDynamicsModel):
         return kl(q, p).sum([-1]).mean()
 
     @staticmethod
-    def add_model_specific_args(parent_parser):
-        """ Placeholder function for model-specific arguments """
-        parser = parent_parser.add_argument_group("DKF")
-        parser.add_argument('--rnn_dim', type=float, default=64, help='size of the RNN encoder dim')
-        return parent_parser
+    def get_model_specific_args():
+        """ Get model-specific  """
+        return {
+            "rnn_dim": 64   # float (default=64) size of the RNN encoder dim
+        }

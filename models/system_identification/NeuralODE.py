@@ -52,7 +52,7 @@ class NeuralODE(LatentDynamicsModel):
         z_init = self.encoder(x)
 
         # Evaluate model forward over T to get L latent reconstructions
-        t = torch.linspace(0, generation_len - 1, generation_len).to(self.device)
+        t = torch.linspace(0, generation_len - 1, generation_len, device=self.device)
 
         # Perform the integration with the Neural ODE.
         # Depending on choice of integrator, different packages need to be used (i.e. symplectic is not in torchdiffeq)

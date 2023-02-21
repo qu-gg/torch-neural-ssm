@@ -82,10 +82,3 @@ class NeuralODE(LatentDynamicsModel):
         zt = torch.stack(zt)
         x_rec = self.decoder(zt.contiguous().view([zt.shape[0] * zt.shape[1], -1]))
         return x_rec, zt
-
-    @staticmethod
-    def add_model_specific_args(parent_parser):
-        """ Placeholder function for model-specific arguments """
-        parser = parent_parser.add_argument_group("NODE")
-        parser.add_argument('--model_file', type=str, default="state_estimation/NeuralODE_SE", help='filename of the model')
-        return parent_parser

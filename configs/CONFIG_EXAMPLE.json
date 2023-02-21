@@ -1,0 +1,60 @@
+{
+  "exptype": "testing",
+  "ckpt_path": "experiments/testing/node/version_1/",
+  "checkpt": "None",
+  "gpus": [0],
+
+  "model": "node",
+  "system_identification": true,
+  "stochastic": false,
+
+  "metrics": [
+    "vpt",
+    "dst",
+    "vpd",
+    "reconstruction_mse",
+    "extrapolation_mse"
+  ],
+
+  "integrator": "symplectic",
+  "integrator_params": {
+    "step_size": 0.5
+  },
+
+  "dataset": "pendulum",
+  "dataset_ver": "pendulum_12500samples_200steps_dt01",
+  "dataset_percent": 0.05,
+  "batches_to_save": 25,
+
+  "num_epochs": 100,
+  "batch_size": 32,
+
+  "learning_rate": 1e-3,
+  "scheduler": {
+    "restart_interval": 32500,
+    "warmup_steps": 200,
+    "decay": 0.90
+  },
+
+  "z0_beta": 1e-2,
+  "kl_beta": 1e-3,
+
+  "dim": 32,
+
+  "latent_dim": 3,
+  "latent_act": "swish",
+  "num_layers": 2,
+  "num_hidden": 128,
+  "num_filt": 8,
+
+  "z_amort": 5,
+
+  "generation_training_len": 15,
+  "generation_validation_len": 30,
+  "generation_varying": false,
+
+  "testing": {
+    "save_files": false,
+    "generation_testing_len": 30
+  }
+}

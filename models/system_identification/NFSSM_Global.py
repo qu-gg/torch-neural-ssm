@@ -166,11 +166,9 @@ class NFSSM_Global(LatentDynamicsModel):
         plt.close()
 
     @staticmethod
-    def add_model_specific_args(parent_parser):
-        """ Add the hyperprior's arguments  """
-        parser = parent_parser.add_argument_group("NFSSM_Global")
-
-        # Network dimensions
-        parser.add_argument('--code_dim', type=int, default=32, help='dimension of the weight codes')
-        parser.add_argument('--hyper_dim', type=int, default=512, help='dimension of the hyperprior function')
-        return parent_parser
+    def get_model_specific_args():
+        """ Add the hyperprior's arguments """
+        return {
+            "code_dim": 32,     # int (default=32) dimension of the weight codes
+            "hyper_dim": 512    # int (default=512) dimension of the hyperprior function
+        }

@@ -15,7 +15,6 @@ import utils.metrics as metrics
 import matplotlib.pyplot as plt
 
 from sklearn.manifold import TSNE
-from utils.metrics import vpt, dst, r2fit, vpd
 from models.CommonVAE import LatentStateEncoder, EmissionDecoder
 from utils.plotting import show_images, get_embedding_trajectories
 from utils.utils import determine_annealing_factor, CosineAnnealingWarmRestartsWithDecayAndLinearWarmup
@@ -40,7 +39,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
 
         # Encoder + Decoder
         self.encoder = LatentStateEncoder(self.args.z_amort, self.args.num_filt, 1, self.args.latent_dim, self.args.stochastic)
-        self.decoder = EmissionDecoder(self.args.batch_size, self.args.generation_len, self.args.dim, self.args.num_filt, 1, self.args.latent_dim)
+        self.decoder = EmissionDecoder(self.args.batch_size, self.args.generation_training_len, self.args.dim, self.args.num_filt, 1, self.args.latent_dim)
 
         # Recurrent dynamics function
         self.dynamics_func = None
@@ -65,9 +64,9 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         return None
 
     @staticmethod
-    def add_model_specific_args(parent_parser):
+    def get_model_specific_args():
         """ Placeholder function for model-specific arguments """
-        return parent_parser
+        return {}
 
     def configure_optimizers(self):
         """
@@ -80,11 +79,13 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         For CosineAnnealing, we set the LR bounds to be [LR * 1e-2, LR]
         """
         optim = torch.optim.AdamW(self.parameters(), lr=self.args.learning_rate)
-        scheduler = CosineAnnealingWarmRestartsWithDecayAndLinearWarmup(optim,
-                                                                        T_0=self.args.restart_interval,
-                                                                        T_mult=1,
-                                                                        eta_min=self.args.learning_rate * 1e-2,
-                                                                        warmup_steps=20, decay=0.90)
+        scheduler = CosineAnnealingWarmRestartsWithDecayAndLinearWarmup(
+            optim,
+            T_0=self.args.scheduler['restart_interval'], T_mult=1,
+            eta_min=self.args.learning_rate * 1e-2,
+            warmup_steps=self.args.scheduler['warmup_steps'],
+            decay=self.args.scheduler['decay']
+        )
 
         # Explicit dictionary to state how often to ping the scheduler
         scheduler = {
@@ -103,23 +104,10 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         self.version_path = f"{os.path.abspath('')}/lightning_logs/version_{self.top}/"
 
         # Get total number of parameters for the model and save
-        pytorch_total_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        self.log("total_num_parameters", float(sum(p.numel() for p in self.parameters() if p.requires_grad)), prog_bar=False)
 
-        # Save hyperparameters to the log
-        params = {
-            'latent_dim': self.args.latent_dim,
-            'num_layers': self.args.num_layers,
-            'num_hidden': self.args.num_hidden,
-            'num_filt': self.args.num_filt,
-            'latent_act': self.args.latent_act,
-            'z_amort': self.args.z_amort,
-            'stochastic': self.args.stochastic,
-            'system_identification': self.args.system_identification,
-            'learning_rate': self.args.learning_rate,
-            'number_params': pytorch_total_params,
-        }
-        with open(f"{self.version_path}/params.json", 'w') as f:
-            json.dump(params, f)
+        # Save config file to the version path
+        shutil.copy(f"{self.args.config_path}", f"{self.version_path}/")
 
         # Make image dir in lightning experiment folder if it doesn't exist
         if not os.path.exists(f"{self.version_path}/images/"):
@@ -199,7 +187,8 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         :param batch_idx: how far in the epoch this batch is
         """
         # Get the generation length - either fixed or random between [1,T] depending on flags
-        generation_len = np.random.randint(1, self.args.generation_len) if self.args.generation_varying is True else self.args.generation_len
+        generation_len = np.random.randint(1, self.args.generation_training_len) \
+            if self.args.generation_varying is True else self.args.generation_training_len
 
         # Get model outputs from batch
         images, states, labels, preds, embeddings = self.get_step_outputs(batch, generation_len)
@@ -294,7 +283,6 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         show_images(outputs[0]["images"], outputs[0]["preds"],
                     f'{self.version_path}/images/recon{self.current_epoch}val.png', num_out=5)
 
-    @torch.no_grad()
     def test_step(self, batch, batch_idx):
         """
         PyTorch-Lightning testing step.
@@ -303,14 +291,14 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         """
         # Get model outputs from batch
         # TODO - Output N runs per batch to get averaged metrics rather than one run
-        images, states, labels, preds, embeddings = self.get_step_outputs(batch, self.args.generation_len)
+        images, states, labels, preds, embeddings = \
+            self.get_step_outputs(batch, self.args.testing['generation_testing_len'])
 
         # Build output dictionary
         out = {"states": states.detach(), "embeddings": embeddings.detach(),
                "preds": preds.detach(), "images": images.detach(), "labels": labels.detach()}
         return out
 
-    @torch.no_grad()
     def test_epoch_end(self, outputs):
         """
         For testing end, save the predictions, gt, and MSE to NPY files in the respective experiment folder
@@ -346,7 +334,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
             os.mkdir(output_path)
 
         # Save files
-        if self.args.save_files is True:
+        if self.args.testing['save_files'] is True:
             np.save(f"{output_path}/test_{self.args.dataset}_recons.npy", preds)
             np.save(f"{output_path}/test_{self.args.dataset}_images.npy", images)
             np.save(f"{output_path}/test_{self.args.dataset}_labels.npy", labels)

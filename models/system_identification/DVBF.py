@@ -263,9 +263,3 @@ class DVBF(LatentDynamicsModel):
         N = Normal(torch.zeros_like(w_mus, device=w_mus.device),
                    torch.ones_like(w_mus, device=w_mus.device))
         return kl(q, N).sum([-1]).mean()
-
-    @staticmethod
-    def add_model_specific_args(parent_parser):
-        return parent_parser
-
-

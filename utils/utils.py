@@ -5,10 +5,31 @@ Utility functions across files
 """
 import os
 import math
-import argparse
+import json
 import torch.nn as nn
+import pytorch_lightning
 
 from torch.optim.lr_scheduler import _LRScheduler
+
+
+def parse_args(parser):
+    """
+    Parse the cmd for a given configuration file and updates the arguments with its content
+    As well, given the arguments, gets which model dynamics function is being used.
+    :return: parsed arguments and model class
+    """
+    # Parse cmd line args
+    parser = pytorch_lightning.Trainer.add_argparse_args(parser)
+    args = parser.parse_args()
+
+    # Load in config file and update parser
+    with open(parser.parse_args().config_path, 'rt') as f:
+        args.__dict__.update(json.load(f))
+
+    # Get the model type from args and add its specific arguments
+    model_type = get_model(args.model, args.system_identification)
+    args.__dict__.update(model_type.get_model_specific_args())
+    return args, model_type
 
 
 def get_model(name, system_identification):
@@ -253,19 +274,16 @@ class CosineAnnealingWarmRestartsWithDecayAndLinearWarmup(_LRScheduler):
         self._last_lr = [group['lr'] for group in self.optimizer.param_groups]
 
 
-class StoreDictKeyPair(argparse.Action):
+def strtobool(val):
+    """Convert a string representation of truth to true (1) or false (0).
+    True values are 'y', 'yes', 't', 'true', 'on', and '1'; false values
+    are 'n', 'no', 'f', 'false', 'off', and '0'.
+    Raises ValueError if 'val' is anything else.
     """
-    Argparse custom action that builds a dictionary of values from a single parameters in the form of
-    --param key1=value1,key2=value2,...
-    """
-    def __call__(self, parser, namespace, values, option_string=None):
-        my_dict = {}
-        for kv in values.split(","):
-            k, v = kv.split("=")
-
-            # Quick check to see if the passed value is
-            try:
-                my_dict[k] = float(v)
-            except ValueError:
-                my_dict[k] = v
-        setattr(namespace, self.dest, my_dict)
+    val = val.lower()
+    if val in ('y', 'yes', 't', 'true', 'on', '1', 'True',  'T',  'true'):
+        return True
+    elif val in ('n', 'no', 'f', 'false', 'off', '0', 'False', 'F', 'false'):
+        return False
+    else:
+        raise ValueError("invalid truth value %r" % (val,))
