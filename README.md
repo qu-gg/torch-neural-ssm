@@ -95,9 +95,8 @@ Given the fast pace of progress in latent dynamics modeling over recent years, m
 The PGM associated with each approach is determined by the latent variable chosen for inference.
 
 <a name="latentSchematic"></a>
-<p align='center'><img src="https://user-images.githubusercontent.com/32918812/203471172-6dcbb898-d2fb-411f-b486-ed153b95bfc6.png" alt="latent variable schematic" /></p>
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/236130430-01cf03b2-4cde-4666-bf84-8be738832868.svg" alt="latent variable schematic" /></p>
 <p align='center'>Fig 2. Schematic of latent variable PGMs in Neural SSMS.</p>
-
 
 <b>System states as latent variables (State Estimation)</b>: The intuitive choice for the latent variable is the 
 latent state <b>z_k</b> that underlies <b>x_k</b>, given that it is already latent in the system and is directly 
