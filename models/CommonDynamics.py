@@ -38,8 +38,8 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         self.exptop = exptop
 
         # Encoder + Decoder
-        self.encoder = LatentStateEncoder(self.args.z_amort, self.args.num_filt, 1, self.args.latent_dim, self.args.stochastic)
-        self.decoder = EmissionDecoder(self.args.batch_size, self.args.generation_training_len, self.args.dim, self.args.num_filt, 1, self.args.latent_dim)
+        self.encoder = LatentStateEncoder(args)
+        self.decoder = EmissionDecoder(args)
 
         # Recurrent dynamics function
         self.dynamics_func = None
@@ -79,21 +79,28 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         For CosineAnnealing, we set the LR bounds to be [LR * 1e-2, LR]
         """
         optim = torch.optim.AdamW(self.parameters(), lr=self.args.learning_rate)
-        scheduler = CosineAnnealingWarmRestartsWithDecayAndLinearWarmup(
-            optim,
-            T_0=self.args.scheduler['restart_interval'], T_mult=1,
-            eta_min=self.args.learning_rate * 1e-2,
-            warmup_steps=self.args.scheduler['warmup_steps'],
-            decay=self.args.scheduler['decay']
-        )
 
-        # Explicit dictionary to state how often to ping the scheduler
-        scheduler = {
-            'scheduler': scheduler,
-            'frequency': 1,
-            'interval': 'step'
-        }
-        return [optim], [scheduler]
+        # Build the scheduler if using it
+        if self.args.use_scheduler is True:
+            scheduler = CosineAnnealingWarmRestartsWithDecayAndLinearWarmup(
+                optim,
+                T_0=self.args.scheduler['restart_interval'], T_mult=1,
+                eta_min=self.args.learning_rate * 1e-2,
+                warmup_steps=self.args.scheduler['warmup_steps'],
+                decay=self.args.scheduler['decay']
+            )
+
+            # Explicit dictionary to state how often to ping the scheduler
+            scheduler = {
+                'scheduler': scheduler,
+                'frequency': 1,
+                'interval': 'step'
+            }
+
+            return [optim], [scheduler]
+
+        # Otherwise just return the optimizer
+        return optim
 
     def on_train_start(self):
         """
@@ -121,10 +128,8 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         :param generation_len: how far out to generate for, dependent on the step (train/val)
         :return: processed model outputs
         """
-        # Stack batch and restrict to generation length
-        images = torch.stack([b['image'] for b in batch[0]])
-        states = torch.stack([b['x'] for b in batch[0]]).squeeze(1)
-        labels = torch.stack([b['class_id'] for b in batch[0]])
+        # Deconstruct batch
+        _, images, states, controls, labels = batch
 
         # Same random portion of the sequence over generation_len, saving room for backwards solving
         random_start = np.random.randint(generation_len, images.shape[1] - self.args.z_amort - generation_len)
@@ -160,7 +165,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         dynamics_loss = self.model_specific_loss(images, preds)
         return likelihood, klz, dynamics_loss
 
-    def get_epoch_metrics(self, outputs):
+    def get_epoch_metrics(self, outputs, setting='train'):
         """
         Takes the dictionary of saved batch metrics, stacks them, and gets outputs to log in the Tensorboard.
         :param outputs: list of dictionaries with outputs from each back
@@ -174,7 +179,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         out_metrics = {}
         for met in self.args.metrics:
             metric_function = getattr(metrics, met)
-            out_metrics[met] = metric_function(images, preds, args=self.args)[0]
+            out_metrics[met] = metric_function(images, preds, args=self.args, setting=setting)[0]
 
         # Return a dictionary of metrics
         return out_metrics
@@ -187,8 +192,8 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         :param batch_idx: how far in the epoch this batch is
         """
         # Get the generation length - either fixed or random between [1,T] depending on flags
-        generation_len = np.random.randint(1, self.args.generation_training_len) \
-            if self.args.generation_varying is True else self.args.generation_training_len
+        generation_len = np.random.randint(1, self.args.gen_len['train']) \
+            if self.args.gen_len['varying'] is True else self.args.gen_len['train']
 
         # Get model outputs from batch
         images, states, labels, preds, embeddings = self.get_step_outputs(batch, generation_len)
@@ -196,17 +201,19 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         # Get model loss terms for the step
         likelihood, klz, dynamics_loss = self.get_step_losses(images, preds)
 
-        # Log ELBO loss terms
-        self.log("likelihood", likelihood, prog_bar=True)
-        self.log("klz_loss", klz, prog_bar=True)
-        self.log("dynamics_loss", dynamics_loss)
-
         # Determine KL annealing factor for the current step
         kl_factor = determine_annealing_factor(self.n_updates, anneal_update=1000)
-        self.log('kl_factor', kl_factor, prog_bar=False)
 
         # Build the full loss
-        loss = likelihood + kl_factor * ((self.args.z0_beta * klz) + dynamics_loss)
+        loss = likelihood + kl_factor * ((self.args.betas['z0'] * klz) + (self.args.betas['kl'] * dynamics_loss))
+
+        # Log ELBO loss terms
+        self.log_dict({
+            "likelihood": likelihood,
+            "kl_z": self.args.betas['z0'] * klz,
+            "dynamics_loss": self.args.betas['kl'] * dynamics_loss,
+            "kl_factor": kl_factor
+        })
 
         # Return outputs as dict
         self.n_updates += 1
@@ -222,7 +229,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         :param outputs: list of outputs from the training steps, with the last 25 steps having reconstructions
         """
         # Log epoch metrics on saved batches
-        metrics = self.get_epoch_metrics(outputs[:self.args.batches_to_save])
+        metrics = self.get_epoch_metrics(outputs[:self.args.batches_to_save], setting='train')
         for metric in metrics.keys():
             self.log(f"train_{metric}", metrics[metric], prog_bar=True)
 
@@ -251,16 +258,16 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         :param batch_idx: how far in the epoch this batch is
         """
         # Get model outputs from batch
-        images, states, labels, preds, embeddings = self.get_step_outputs(batch, self.args.generation_validation_len)
+        images, states, labels, preds, embeddings = self.get_step_outputs(batch, self.args.gen_len['val'])
 
         # Get model loss terms for the step
         likelihood, klz, dynamics_loss = self.get_step_losses(images, preds)
 
-        # Log validation likelihood and metrics
-        self.log("val_likelihood", likelihood, prog_bar=True)
-
         # Build the full loss
         loss = likelihood + dynamics_loss
+
+        # Log validation likelihood and metrics
+        self.log("val_likelihood", likelihood, prog_bar=True)
 
         # Return outputs as dict
         out = {"loss": loss}
@@ -275,7 +282,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         :param outputs: list of outputs from the validation steps at batch 0
         """
         # Log epoch metrics on saved batches
-        metrics = self.get_epoch_metrics(outputs[:self.args.batches_to_save])
+        metrics = self.get_epoch_metrics(outputs[:self.args.batches_to_save], setting='val')
         for metric in metrics.keys():
             self.log(f"val_{metric}", metrics[metric], prog_bar=True)
 
@@ -291,84 +298,68 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         """
         # Get model outputs from batch
         # TODO - Output N runs per batch to get averaged metrics rather than one run
-        images, states, labels, preds, embeddings = \
-            self.get_step_outputs(batch, self.args.testing['generation_testing_len'])
+        images, states, labels, preds, embeddings = self.get_step_outputs(batch, self.args.gen_len['test'])
 
         # Build output dictionary
         out = {"states": states.detach(), "embeddings": embeddings.detach(),
                "preds": preds.detach(), "images": images.detach(), "labels": labels.detach()}
         return out
 
-    def test_epoch_end(self, outputs):
+    def test_epoch_end(self, batch_outputs):
         """
         For testing end, save the predictions, gt, and MSE to NPY files in the respective experiment folder
         :param outputs: list of outputs from the validation steps at batch 0
         """
-        # Stack all outputs
-        preds, images, states, embeddings, labels = [], [], [], [], []
-        for output in outputs:
-            preds.append(output["preds"])
-            images.append(output["images"])
-            states.append(output["states"])
-            labels.append(output["labels"])
-            embeddings.append(output["embeddings"])
-
-        preds = torch.vstack(preds).cpu().numpy()
-        images = torch.vstack(images).cpu().numpy()
-        states = torch.vstack(states).cpu().numpy()
-        embeddings = torch.vstack(embeddings).cpu().numpy()
-        labels = torch.vstack(labels).cpu().numpy()
-        del outputs
+        # Stack all output types and convert to numpy
+        outputs = dict()
+        for key in batch_outputs[0].keys():
+            stack_method = torch.concatenate if key == "som_assignments" else torch.vstack
+            outputs[key] = stack_method([output[key] for output in batch_outputs]).cpu().numpy()
 
         # Iterate through each metric function and add to a dictionary
         out_metrics = {}
         for met in self.args.metrics:
             metric_function = getattr(metrics, met)
-            metric_mean, metric_std = metric_function(images, preds, args=self.args)
+            metric_mean, metric_std = metric_function(outputs["images"], outputs["preds"], args=self.args, setting='test')
             out_metrics[f"{met}_mean"], out_metrics[f"{met}_std"] = float(metric_mean), float(metric_std)
             print(f"=> {met}: {metric_mean:4.5f}+-{metric_std:4.5f}")
 
         # Set up output path and create dir
-        output_path = f"{self.args.ckpt_path}/test_{self.args.dataset}"
+        output_path = f"{self.args.model_path}/test_{self.args.setting}"
         if not os.path.exists(output_path):
             os.mkdir(output_path)
 
         # Save files
-        if self.args.testing['save_files'] is True:
-            np.save(f"{output_path}/test_{self.args.dataset}_recons.npy", preds)
-            np.save(f"{output_path}/test_{self.args.dataset}_images.npy", images)
-            np.save(f"{output_path}/test_{self.args.dataset}_labels.npy", labels)
+        if self.args.save_files is True:
+            np.save(f"{output_path}/test_{self.args.setting}_recons.npy", outputs["preds"])
+            np.save(f"{output_path}/test_{self.args.setting}_images.npy", outputs["images"])
+            np.save(f"{output_path}/test_{self.args.setting}_labels.npy", outputs["labels"])
 
         # Save some examples
-        show_images(images[:10], preds[:10], f"{output_path}/test_{self.args.dataset}_examples.png", num_out=5)
+        show_images(outputs["images"][:10], outputs["preds"][:10], f"{output_path}/test_{self.args.setting}_examples.png", num_out=5)
 
         # Save trajectory examples
-        get_embedding_trajectories(embeddings[0], states[0], f"{output_path}/")
+        get_embedding_trajectories(outputs["embeddings"][0], outputs["states"][0], f"{output_path}/")
 
         # Get Z0 TSNE
         tsne = TSNE(n_components=2, perplexity=30, learning_rate=200, n_iter=1000, early_exaggeration=12)
-        fitted = tsne.fit(embeddings[:, 0])
-        print("Finished after {} iterations".format(fitted.n_iter))
+        fitted = tsne.fit(outputs["embeddings"][:, 0])
         tsne_embedding = fitted.embedding_
 
-        # Plot prototypes
-        colors = {0: 'coral', 1: 'purple', 2: 'orange', 3: 'blue', 4: 'springgreen', 5: 'green', 6: 'cadetblue',
-                  7: 'red', 8: 'gold', 9: 'greenyellow', 10: 'black', 11: 'cyan', 12: 'dodgerblue',
-                  13: 'm', 14: 'orchid', 15: 'gray'}  # , 'k'}
-        for i in np.unique(labels):
-            subset = tsne_embedding[np.where(labels == i)[0], :]
-            plt.scatter(subset[:, 0], subset[:, 1], c=colors[int(i)])
+        for i in np.unique(outputs["labels"]):
+            subset = tsne_embedding[np.where(outputs["labels"] == i)[0], :]
+            plt.scatter(subset[:, 0], subset[:, 1], c=next(plt.gca()._get_lines.prop_cycler)['color'])
 
         plt.title("t-SNE Plot of Z0 Embeddings")
-        plt.legend(np.unique(labels), loc='center left', bbox_to_anchor=(1, 0.5))
-        plt.savefig(f"{output_path}/test_{self.args.dataset}_Z0tsne.png", bbox_inches='tight')
+        plt.legend(np.unique(outputs["labels"]), loc='center left', bbox_to_anchor=(1, 0.5))
+        plt.savefig(f"{output_path}/test_{self.args.setting}_Z0tsne.png", bbox_inches='tight')
         plt.close()
 
         # Save metrics to JSON in checkpoint folder
-        with open(f"{output_path}/test_{self.args.dataset}_metrics.json", 'w') as f:
+        with open(f"{output_path}/test_{self.args.setting}_metrics.json", 'w') as f:
             json.dump(out_metrics, f)
 
         # Save metrics to an easy excel conversion style
-        with open(f"{output_path}/test_{self.args.dataset}_excel.txt", 'w') as f:
+        with open(f"{output_path}/test_{self.args.setting}_excel.txt", 'w') as f:
             for metric in self.args.metrics:
                 f.write(f"{out_metrics[f'{metric}_mean']:0.3f}({out_metrics[f'{metric}_std']:0.3f}),")

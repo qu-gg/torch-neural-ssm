@@ -2,85 +2,73 @@
 @file dataloader.py
 @author Ryan Missel
 
-Holds the WebDataset classes for the available datasets
+Holds the LightningDataModule for the available datasets
 """
-import os
-import webdataset as wds
+import torch
+import numpy as np
 import pytorch_lightning
+from torch.utils.data import Dataset, DataLoader
 
 
-class Dataset(pytorch_lightning.LightningDataModule):
-    def __init__(self, args, batch_size=32, workers=0):
-        super(Dataset, self).__init__()
-        # Get the number of shards used for the given data size
-        num_shards = int(args.dataset_percent * 999)
+class SSMDataset(Dataset):
+    """ Basic Dataset object for the SSM """
+    def __init__(self, images, labels, states, controls):
+        self.images = images
+        self.labels = labels
+        self.states = states
+        self.controls = controls
 
-        # Build shard paths for the training data
-        bucket = os.path.abspath('').replace('\\', '/') + f"/data/{args.dataset}/{args.dataset_ver}/train_tars/"
-        shards = "{000.." + str(num_shards) + "}.tar"
-        self.training_urls = os.path.join(bucket, shards)
+    def __len__(self):
+        return self.images.shape[0]
 
-        # Build shard paths for the validation data
-        bucket = os.path.abspath('').replace('\\', '/') + f"/data/{args.dataset}/{args.dataset_ver}/val_tars/"
-        shards = "{000.." + str(num_shards) + "}.tar"
-        self.validation_urls = os.path.join(bucket, shards)
+    def __getitem__(self, idx):
+        return torch.Tensor([idx]), self.images[idx], self.states[idx], self.controls[idx], self.labels[idx]
 
-        # Build shard paths for the testing data
-        bucket = os.path.abspath('').replace('\\', '/') + f"/data/{args.dataset}/{args.dataset_ver}/test_tars/"
-        shards = "{000.." + str(num_shards) + "}.tar"
-        self.testing_urls = os.path.join(bucket, shards)
 
-        # Various parameters
-        self.batch_size = batch_size
-        self.num_workers = workers
+class SSMDataModule(pytorch_lightning.LightningDataModule):
+    """ Custom DataModule object that handles preprocessing all sets of data for a given run """
+    def __init__(self, args):
+        super(SSMDataModule, self).__init__()
+        self.args = args
 
-    def make_loader(self, urls, mode="train"):
-        """
-        Builds and shuffles the WebDataset and constructs the WebLoader
-        :param urls: local file paths of the shards
-        :param mode: whether to shuffle the WDS or not
-        :return: WebLoader object
-        """
-        shuffle = 1000 if mode == "train" else 0
+    def make_loader(self, mode="train", shuffle=True):
+        # Load in NPZ
+        npzfile = np.load(f"data/{self.args.dataset}/{mode}.npz")
 
-        if mode == "train":
-            dataset = (
-                wds.WebDataset(urls, shardshuffle=True)
-                    .shuffle(shuffle)
-                    .decode("rgb")
-                    .to_tuple("npz")
-                    .batched(self.batch_size, partial=False)
-            )
-        else:
-            dataset = (
-                wds.WebDataset(urls, shardshuffle=False)
-                    .decode("rgb")
-                    .to_tuple("npz")
-                    .batched(self.batch_size, partial=False)
-            )
+        # Load in data sources
+        images = npzfile['image'].astype(np.float32)
+        labels = npzfile['label'].astype(np.int16)
+        states = npzfile['state'].astype(np.float32)[:, :, :2]
 
-        loader = wds.WebLoader(
-            dataset,
-            batch_size=None,
-            shuffle=False,
-            num_workers=self.num_workers
-        )
+        # Load control, if it exists, else make a dummy one
+        controls = npzfile['control'] if 'control' in npzfile else np.zeros((images.shape[0], images.shape[1], 1), dtype=np.float32)
 
-        if mode == "train":
-            loader.unbatched().shuffle(1000).batched(self.batch_size, partial=False)
-        return loader
+        # Modify based on dataset percent
+        rand_idx = np.random.choice(range(images.shape[0]), size=int(images.shape[0] * self.args.dataset_percent), replace=False)
+        images = images[rand_idx]
+        labels = labels[rand_idx]
+        states = states[rand_idx]
+        controls = controls[rand_idx]
+
+        # Convert to Tensors
+        images = torch.from_numpy(images)
+        labels = torch.from_numpy(labels)
+        states = torch.from_numpy(states)
+        controls = torch.from_numpy(controls)
+
+        # Build dataset and corresponding Dataloader
+        dataset = SSMDataset(images, labels, states, controls)
+        dataloader = DataLoader(dataset, batch_size=self.args.batch_size, shuffle=shuffle)
+        return dataloader
 
     def train_dataloader(self):
         """ Getter function that builds and returns the training dataloader """
-        print(f"=> Loading training urls: {self.training_urls}")
-        return self.make_loader(self.training_urls, "train")
+        return self.make_loader("train", shuffle=True)
 
     def val_dataloader(self):
         """ Getter function that builds and returns the validation dataloader """
-        print(f"=> Loading validation urls: {self.validation_urls}")
-        return self.make_loader(self.validation_urls, "val")
+        return self.make_loader("val", shuffle=False)
 
     def test_dataloader(self):
         """ Getter function that builds and returns the testing dataloader """
-        print(f"=> Loading testing urls: {self.testing_urls}")
-        return self.make_loader(self.testing_urls, "test")
+        return self.make_loader("test", shuffle=False)

@@ -127,117 +127,60 @@ if __name__ == '__main__':
 
     # Parameters of generation, resolution and number of samples
     scale = 1
-    train_size_generate = 2000
-    train_size_save = train_size_generate - 1000
+    timesteps = 75
+    training_size = 8000
+    validation_size = 2000
+    testing_size = 2000
 
-    test_size_generate = 3000
-    test_size_save = test_size_generate - 1000
-
-    base_dir = f"bouncing_ball/bouncingball_{train_size_save}samples_{200}steps/"
+    base_dir = f"bouncingball_{training_size}samples_{timesteps}steps/"
 
     # Arrays to hold sets
     train_images, train_states = [], []
     test_images, test_states = [], []
     np.random.seed(1234)
 
-    # Generate the training/val set
-    cannon = BallBox(dt=0.5, res=(32*scale, 32*scale), init_pos=(16*scale, 16*scale), init_std=8, wall=None, gravity=(0.0, 0.0), ball_color="white")
-    i, s = cannon.run(delay=None, iterations=200, sequences=train_size_generate, radius=4, angle_limits=(0, 360), velocity_limits=(5.0, 10.0), save='npz')
+    # Generate the data sequences
+    cannon = BallBox(dt=0.5, res=(32*scale, 32*scale), init_pos=(16*scale, 16*scale), init_std=8,
+                     wall=None, gravity=(0.0, 0.0), ball_color="white")
+    i, s = cannon.run(delay=None, iterations=timesteps, sequences=training_size + validation_size + testing_size,
+                      radius=4, angle_limits=(0, 360), velocity_limits=(5.0, 10.0), save='npz')
 
-    # rows = np.any(np.all(i.reshape([i.shape[0], i.shape[1], -1])) == 0, axis=0)
-    # i = np.delete(i, rows, 0)
-    # s = np.delete(s, rows, 0)
-    # i = i[:train_size_save, :]
-    # s = s[:train_size_save, :]
-
-    i[i > 0] = 1
-    i[i == 0] = 0.32
-    train_images.append(i)
-    train_classes = np.full([i.shape[0], 1], fill_value=2)
-    train_states.append(s)
-
-    # Generate the test set
-    cannon = BallBox(dt=0.5, res=(32*scale, 32*scale), init_pos=(16*scale, 16*scale), init_std=8, wall=None, gravity=(0.0, 0.0), ball_color="white")
-    i, s = cannon.run(delay=None, iterations=200, sequences=test_size_generate, radius=4, angle_limits=(0, 360), velocity_limits=(5.0, 10.0), save='npz')
-    if np.any(s[:, :, :2] < 0) or np.any(s[:, :, :2] > 32):
-        rows = np.union1d(np.unique(np.where(s[:, :, :2] < 0)[0]), np.unique(np.where(s[:, :, :2] > 32)[0]))
-        i = np.delete(i, rows, 0)
-        s = np.delete(s, rows, 0)
-        if i.shape[0] > test_size_save:
-            i = i[:test_size_save, :]
-            s = s[:test_size_save, :]
-
+    # Setting the pixels to a uniform background and foreground (for simplicity of training)
     i[i > 0] = 1
     i[i == 0] = 0.32
 
-    test_images.append(i)
-    test_classes = np.full([i.shape[0], 1], fill_value=2)
-    test_states.append(s)
+    # Break into train and test sets, adding in generic labels
+    train_images = i[:training_size]
+    train_states = s[:training_size]
+    train_classes = np.full([train_images.shape[0], 1], fill_value=2)
 
-    # Concatenate the images together
-    train_images = np.concatenate(train_images, axis=0)
-    train_states = np.concatenate(train_states, axis=0)
-    test_images = np.concatenate(test_images, axis=0)
-    test_states = np.concatenate(test_states, axis=0)
+    val_images = i[training_size:training_size + validation_size]
+    val_states = s[training_size:training_size + validation_size]
+    val_classes = np.full([val_images.shape[0], 1], fill_value=2)
 
-    train_states, test_states = train_states[:, np.newaxis, :, :], test_states[:, np.newaxis, :, :]
-    print(train_images.shape, train_classes.shape, test_images.shape)
-    print(f"Images: {train_images.shape} | States: {train_states.shape} | Classes: {train_classes.shape}")
+    test_images = i[training_size + validation_size:]
+    test_states = s[training_size + validation_size:]
+    test_classes = np.full([test_images.shape[0], 1], fill_value=2)
 
-    train_size = train_images.shape[0]
-    test_size = test_images.shape[0]
+    print(f"Train - Images: {train_images.shape} | States: {train_states.shape} | Classes: {train_classes.shape}")
+    print(f"Val - Images: {val_images.shape} | States: {val_states.shape} | Classes: {val_classes.shape}")
+    print(f"Test - Images: {test_images.shape} | States: {test_states.shape} | Classes: {test_classes.shape}")
 
     # Make sure all directories are made beforehand
     if not os.path.exists(f"{base_dir}/"):
         os.mkdir(f"{base_dir}/")
 
-    if not os.path.exists(f"{base_dir}/examples/"):
-        os.mkdir(f"{base_dir}/examples/")
-
-    if not os.path.exists(f"{base_dir}/train/"):
-        os.mkdir(f"{base_dir}/train/")
-
-    if not os.path.exists(f"{base_dir}/test/"):
-        os.mkdir(f"{base_dir}/test/")
-
-    if not os.path.exists(f"{base_dir}/train_tars/"):
-        os.mkdir(f"{base_dir}/train_tars/")
-
-    if not os.path.exists(f"{base_dir}/test_tars/"):
-        os.mkdir(f"{base_dir}/test_tars/")
-
     # Permute the sets and states together
     p = np.random.permutation(train_images.shape[0])
     train_images, train_classes, train_states = train_images[p], train_classes[p], train_states[p]
 
+    p = np.random.permutation(val_images.shape[0])
+    val_images, val_classes, val_states = val_images[p], val_classes[p], val_states[p]
+
     p = np.random.permutation(test_images.shape[0])
     test_images, test_classes, test_states = test_images[p],test_classes[p], test_states[p]
 
-    # Save as individual files
-    for idx, (i, c, s) in enumerate(zip(train_images, train_classes, train_states)):
-        np.savez(os.path.abspath(f"{base_dir}/train/{idx}.npz"), image=i, x=s, class_id=c)
-
-    for idx, (i, c, s) in enumerate(zip(test_images, test_classes, test_states)):
-        np.savez(os.path.abspath(f"{base_dir}/test/{idx}.npz"), image=i, x=s, class_id=c)
-
-    # Tar train into chunks for WebDataset
-    file_list = os.listdir(f"{base_dir}/train/")
-    random.shuffle(file_list)
-
-    n_shards = 1000
-    elements_per_shard = len(file_list) // n_shards
-    for n in tqdm(range(n_shards)):
-        with tarfile.open(f"{base_dir}/train_tars/{n:0:04}.tar", "w:gz") as tar:
-            for file in file_list[n * elements_per_shard: (n + 1) * elements_per_shard]:
-                tar.add(f"{base_dir}/train/{file}")
-
-    # Tar test into chunks for WebDataset
-    file_list = os.listdir(f"{base_dir}/test/")
-    random.shuffle(file_list)
-
-    n_shards = 1000
-    elements_per_shard = len(file_list) // n_shards
-    for n in tqdm(range(n_shards)):
-        with tarfile.open(f"{base_dir}/test_tars/{n:0:04}.tar", "w:gz") as tar:
-            for file in file_list[n * elements_per_shard: (n + 1) * elements_per_shard]:
-                tar.add(f"{base_dir}/test/{file}")
+    # Save sets
+    np.savez(os.path.abspath(f"{base_dir}/train.npz"), image=train_images, state=train_states, label=train_classes)
+    np.savez(os.path.abspath(f"{base_dir}/val.npz"), image=val_images, state=val_states, label=val_classes)
+    np.savez(os.path.abspath(f"{base_dir}/test.npz"), image=test_images, state=test_states, label=test_classes)

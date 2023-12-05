@@ -4,12 +4,13 @@
 Main entrypoint for the training and testing environments. Takes in a configuration file
 of arguments and either trains a model or tests a given model and checkpoint.
 """
-import os
 import argparse
+import shutil
+
 import pytorch_lightning
 
-from utils.dataloader import Dataset
-from utils.utils import parse_args, get_exp_versions, strtobool
+from utils.dataloader import SSMDataModule
+from utils.utils import parse_args, get_exp_versions, get_model_paths, strtobool, find_best_epoch
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, LearningRateMonitor
 
 
@@ -19,12 +20,9 @@ if __name__ == '__main__':
 
     # Define the parser with the configuration file path
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config_path', type=str, default='configs/CONFIG_EXAMPLE.json',
-                        help='path and name of the configuration .json to load')
-    parser.add_argument('--train', type=strtobool, default=True,
-                        help='whether to train or test the given model')
-    parser.add_argument('--resume', type=strtobool, default=False,
-                        help='whether to continue training from the checkpoint in the config')
+    parser.add_argument('--config_path', type=str, default='configs/grav16.json', help='config .json to load')
+    parser.add_argument('--train', type=strtobool, default=True, help='whether to train or test the given model')
+    parser.add_argument('--resume', type=strtobool, default=False, help='whether to continue training from ckpt')
 
     # Parse the config file and get the model function used
     args, model_type = parse_args(parser)
@@ -33,8 +31,11 @@ if __name__ == '__main__':
     global top, exptop
     top, exptop = get_exp_versions(args.model, args.exptype)
 
-    # Input generation
-    dataset = Dataset(args=args, batch_size=args.batch_size)
+    # Build the model path if not given
+    args.model_path = get_model_paths(args)
+
+    # Building the PL-DataModule for all splits
+    datamodule = SSMDataModule(args=args)
 
     # Initialize model
     model = model_type(args, top, exptop)
@@ -62,22 +63,29 @@ if __name__ == '__main__':
         auto_select_gpus=True
     )
 
+    # Training from scratch
     if args.train is True and args.resume is False:
-        trainer.fit(model, dataset)
-    else:
-        # Get the checkpoint - either a given one or the last.ckpt in the folder
-        if args.checkpt != "None":
-            ckpt_path = args.ckpt_path + "/checkpoints/" + args.checkpt
-        else:
-            ckpt_path = f"{args.ckpt_path}/checkpoints/{os.listdir(f'{args.ckpt_path}/checkpoints/')[-1]}"
+        trainer.fit(model, datamodule)
 
-        # If it is training, then resume from the given checkpoint
-        if args.train is True:
-            trainer.fit(
-                model, dataset,
-                ckpt_path=f"{args.ckpt_path}/checkpoints/{os.listdir(f'{args.ckpt_path}/checkpoints/')[-1]}"
-            )
+    # Training from the last epoch
+    elif args.train is True and args.resume is True:
+        ckpt_path = args.model_path + "/checkpoints/" + args.checkpt if args.checkpt != "None" \
+            else f"{args.model_path}/checkpoints/last.ckpt"
 
-        # Otherwise test the model
-        else:
-            trainer.test(model, dataset, ckpt_path=ckpt_path)
+        trainer.fit(model, datamodule, ckpt_path=ckpt_path)
+
+    # Testing the model on each split
+    ckpt_path = args.model_path + "/checkpoints/" + args.checkpt if args.checkpt not in ["", "None"] \
+        else f"{args.model_path}/checkpoints/{find_best_epoch(args.model_path)[0]}"
+
+    args.setting = 'train'
+    trainer.test(model, datamodule.train_dataloader(), ckpt_path=ckpt_path)
+
+    args.setting = 'val'
+    trainer.test(model, datamodule.val_dataloader(), ckpt_path=ckpt_path)
+
+    args.setting = 'test'
+    trainer.test(model, datamodule.test_dataloader(), ckpt_path=ckpt_path)
+
+    # Delete the lightning log
+    shutil.rmtree(f"lightning_logs/version_{top}/")

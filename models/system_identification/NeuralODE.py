@@ -24,8 +24,8 @@ class ODEFunction(nn.Module):
         self.acts = nn.ModuleList([])
         self.layers = nn.ModuleList([])
         for i, (n_in, n_out) in enumerate(zip(self.layers_dim[:-1], self.layers_dim[1:])):
-            self.acts.append(get_act(args.latent_act) if i < args.num_layers else get_act('linear'))
-            self.layers.append(nn.Linear(n_in, n_out, device=args.gpus[0]))
+            self.acts.append(get_act(args.latent_act) if i < args.num_layers else get_act('tanh'))
+            self.layers.append(nn.Linear(n_in, n_out, device=args.devices[0]))
 
     def forward(self, t, x):
         """ Wrapper function for the odeint calculation """

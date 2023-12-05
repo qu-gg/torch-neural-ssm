@@ -6,6 +6,7 @@ Utility functions across files
 import os
 import math
 import json
+import numpy as np
 import torch.nn as nn
 import pytorch_lightning
 
@@ -148,7 +149,7 @@ def get_exp_versions(model, exptype):
             continue
 
     top += 1
-    print("Version {}".format(top))
+    print("Lightning Log V{}".format(top))
 
     # Set up paths if they don't exist
     if not os.path.exists("experiments/"):
@@ -170,8 +171,61 @@ def get_exp_versions(model, exptype):
             continue
 
     exptop += 1
-    print("Exp Top {}".format(exptop))
+    print("Experiment V{}".format(exptop))
     return top, exptop
+
+
+def get_model_paths(args):
+    """ Build the model folder path for a given model from its config args """
+    model_path = ""
+
+    # Get latest version number folder for experiment if none given
+    if args.model_path in ["None", ""]:
+        # Find version folder path
+        exptop = 0
+
+        if len(os.listdir(f"experiments/{args.exptype}/{args.model}/")) == 0:
+            exptop += 1
+        else:
+            for folder in os.listdir(f"experiments/{args.exptype}/{args.model}/"):
+                try:
+                    num = int(folder.split("_")[-1])
+                    exptop = num if num > exptop else exptop
+                except ValueError:
+                    continue
+
+            exptop += 1
+
+        model_path += f"experiments/{args.exptype}/{args.model}/version_{exptop}/"
+    else:
+        model_path += f"{args.model_path}"
+
+    print(f"=> Built Model Path: {model_path}")
+    return model_path
+
+
+def find_best_epoch(ckpt_folder):
+    """
+    Find the highest epoch in the Test Tube file structure.
+    :param ckpt_folder: dir where the checpoints are being saved.
+    :return: float of the highest epoch reached by the checkpoints.
+    """
+    best_ckpt = None
+    best_epoch = None
+    best = np.inf
+    filenames = os.listdir(f"{ckpt_folder}/checkpoints/")
+    for filename in filenames:
+        if "last" in filename:
+            continue
+
+        test_value = float(filename[:-5].split("mse")[-1])
+        test_epoch = int(filename.split('-')[0].replace('epoch', ''))
+        if test_value < best:
+            best = test_value
+            best_ckpt = filename
+            best_epoch = test_epoch
+
+    return best_ckpt, best_epoch
 
 
 def determine_annealing_factor(n_updates, min_anneal_factor=0.0, anneal_update=10000):

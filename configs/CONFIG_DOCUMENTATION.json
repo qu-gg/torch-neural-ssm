@@ -5,8 +5,11 @@
 
   // Experiment ID and Checkpoint to Load
   "exptype": "str (default=testing): experiment folder name",
-  "ckpt_path": "str (default=None): checkpoint to resume training from",
-  "gpus": "list (default=[0]): which gpu devices to use",
+  "model_path": "str (default=''): path to the experiments folder",
+  "checkpt": "str (default=''): checkpoint name to use",
+  "accelerator": "str (default='gpu') whether to use cpu, gpu, tpu",
+  "devices": "list (default=[0]): which gpu devices to use",
+  "num_workers": "int (default=0): how many workers for DataLoaders",
 
   // Defining which model and model version to use
   "model": "str (default=none): choice of latent dynamics function",
@@ -22,9 +25,9 @@
 
   // Dataset-to-use parameters
   "dataset": "str (default=pendulum): dataset folder name",
-  "dataset_ver": "str (default=pendulum_12500samples_200steps_dt01): dataset version, which holds .tar files",
-  "dataset_percent": "float (default=0.1): percent of the dataset to use",
+  "dataset_percent": "float (default=1.0): percent of the dataset to use",
   "batches_to_save": "int (default=50): how many batches' outputs to output for metrics per epoch",
+  "save_files": "bool (default=true): whether to save input data and predictions in each experiment folder"
 
   // Learning parameters
   "num_epochs": "int (default=100): how many epochs to train over",
@@ -32,6 +35,7 @@
 
   // Learning rate parameters
   "learning_rate": "float (default=1e-3): initial learning rate",
+  "use_scheduker": "bool (default=true): whether to use the LR scheduler or not",
   "scheduler": {
     "restart_interval": "int (default=32500): how many steps inbetween warm scheduler restarts",
     "warmup_steps": "int (default=200): how many linear warmup steps to use",
@@ -39,11 +43,14 @@
   },
 
   // Tuning parameters
-  "z0_beta": "float (default=1e-2): beta of the kl term for z0",
-  "kl_beta": "float (default=1e-3): beta of the kl term for the dynamics loss",
+  "betas": {
+    "z0": "float (default=1e-2): beta of the kl term for z0",
+    "kl": "float (default=1e-3): beta of the kl term for the dynamics loss"
+  },
 
   // Input dimensions
   "dim": "int (default=32): dimension of the input data, assuming square images",
+  "num_channel": "int (default=1): number of image color channels",
 
   // Network dimensions
   "latent_dim": "int (default=3): size of the latent vector field",
@@ -56,7 +63,10 @@
   "z_amort": "int (default=5): how many frames of observation given to use in z0 inference",
 
   // Timesteps to generate out
-  "generation_len": "int (default=15): total number of timesteps to generate out and train on (including z_amort)",
-  "generation_validation_len": "int (default=30): how many timesteps to generate out in validation metrics",
-  "generation_varying": "bool (default=false): whether to vary the generation length per batch"
+  "gen_len": {
+    "varying": "bool (default=false): whether to vary the generation length per batch",
+    "train": "int (default=15): total number of timesteps to generate out and train on (including z_amort)",
+    "val": "int (default=30): how many timesteps to generate out in validation metrics",
+    "test": "int (default=30): how many timesteps to generate out in testing metrics"
+  }
 }
