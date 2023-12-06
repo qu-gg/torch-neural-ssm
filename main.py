@@ -4,9 +4,8 @@
 Main entrypoint for the training and testing environments. Takes in a configuration file
 of arguments and either trains a model or tests a given model and checkpoint.
 """
-import argparse
 import shutil
-
+import argparse
 import pytorch_lightning
 
 from utils.dataloader import SSMDataModule
@@ -44,14 +43,14 @@ if __name__ == '__main__':
     checkpoint_callback = ModelCheckpoint(monitor='val_reconstruction_mse',
                                           filename='epoch{epoch:02d}-val_reconstruction_mse{val_reconstruction_mse:.4f}',
                                           auto_insert_metric_name=False, save_last=True)
-    early_stop_callback = EarlyStopping(monitor="val_mse_recon", min_delta=0.0005, patience=10, mode="min")
+    early_stop_callback = EarlyStopping(monitor="val_reconstruction_mse", min_delta=0.0001, patience=15, mode="min")
     lr_monitor = LearningRateMonitor(logging_interval='step')
 
     # Initialize trainer
     trainer = pytorch_lightning.Trainer.from_argparse_args(
         args,
         callbacks=[
-            # early_stop_callback,
+            early_stop_callback,
             lr_monitor,
             checkpoint_callback
         ],

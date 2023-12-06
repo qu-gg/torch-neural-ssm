@@ -28,7 +28,7 @@
   "batches_to_save": 25,
   "save_files": false,
 
-  "num_steps": 120000,
+  "num_steps": 250000,
   "batch_size": 32,
 
   "learning_rate": 1e-3,
