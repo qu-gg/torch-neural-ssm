@@ -58,7 +58,12 @@ class SSMDataModule(pytorch_lightning.LightningDataModule):
 
         # Build dataset and corresponding Dataloader
         dataset = SSMDataset(images, labels, states, controls)
-        dataloader = DataLoader(dataset, batch_size=self.args.batch_size, shuffle=shuffle)
+
+        if mode == "train":
+            sampler = torch.utils.data.RandomSampler(dataset, replacement=True, num_samples=self.args.num_steps * self.args.batch_size)
+            dataloader = DataLoader(dataset, sampler=sampler, batch_size=self.args.batch_size, drop_last=True)
+        else:
+            dataloader = DataLoader(dataset, batch_size=self.args.batch_size, shuffle=shuffle)
         return dataloader
 
     def train_dataloader(self):

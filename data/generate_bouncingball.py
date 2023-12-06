@@ -128,9 +128,9 @@ if __name__ == '__main__':
     # Parameters of generation, resolution and number of samples
     scale = 1
     timesteps = 75
-    training_size = 8000
-    validation_size = 2000
-    testing_size = 2000
+    training_size = 25000
+    validation_size = 5000
+    testing_size = 5000
 
     base_dir = f"bouncingball_{training_size}samples_{timesteps}steps/"
 

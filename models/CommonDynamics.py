@@ -51,6 +51,8 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         # Losses
         self.reconstruction_loss = nn.MSELoss(reduction='none')
 
+        self.outputs = list()
+
     def forward(self, x, generation_len):
         """ Placeholder function for the dynamics forward pass """
         raise NotImplementedError("In forward function: Latent Dynamics function not specified.")
@@ -218,38 +220,36 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         # Return outputs as dict
         self.n_updates += 1
         out = {"loss": loss, "labels": labels.detach()}
-        if batch_idx < self.args.batches_to_save:
+        if len(self.outputs) < self.args.batches_to_save:
             out["preds"] = preds.detach()
             out["images"] = images.detach()
+            self.outputs.append(out)
         return out
 
-    def training_epoch_end(self, outputs):
-        """
-        # Every 4 epochs, get a reconstruction example, model-specific plots, and copy over to the experiments folder
-        :param outputs: list of outputs from the training steps, with the last 25 steps having reconstructions
-        """
-        # Log epoch metrics on saved batches
-        metrics = self.get_epoch_metrics(outputs[:self.args.batches_to_save], setting='train')
-        for metric in metrics.keys():
-            self.log(f"train_{metric}", metrics[metric], prog_bar=True)
+    def on_train_batch_end(self, outputs, batch, batch_idx):
+        """ Given the iterative training, check on every batch's end whether it is evaluation time or not """
+        if batch_idx % 2500 == 0 and batch_idx != 0:
+            # Log epoch metrics on saved batches
+            metrics = self.get_epoch_metrics(self.outputs[:self.args.batches_to_save], setting='train')
+            for metric in metrics.keys():
+                self.log(f"train_{metric}", metrics[metric], prog_bar=True)
 
-        # Only log images every 10 epochs
-        if self.current_epoch % 10 != 0:
-            return
+            # Show side-by-side reconstructions
+            show_images(self.outputs[0]["images"], self.outputs[0]["preds"],
+                        f'{self.version_path}/images/recon{batch_idx}train.png', num_out=5)
 
-        # Show side-by-side reconstructions
-        show_images(outputs[0]["images"], outputs[0]["preds"],
-                    f'{self.version_path}/images/recon{self.current_epoch}train.png', num_out=5)
+            # Get per-dynamics plots
+            self.model_specific_plotting(self.version_path, self.outputs)
 
-        # Get per-dynamics plots
-        self.model_specific_plotting(self.version_path, outputs)
+            # Copy experiment to relevant folder
+            if self.args.exptype is not None:
+                shutil.copytree(
+                    self.version_path, f"experiments/{self.args.exptype}/{self.args.model}/version_{self.exptop}",
+                    dirs_exist_ok=True
+                )
 
-        # Copy experiment to relevant folder
-        if self.args.exptype is not None:
-            shutil.copytree(
-                self.version_path, f"experiments/{self.args.exptype}/{self.args.model}/version_{self.exptop}",
-                dirs_exist_ok=True
-            )
+            # Clear out the old cache
+            self.outputs = list()
 
     def validation_step(self, batch, batch_idx):
         """
@@ -288,7 +288,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
 
         # Get image reconstructions
         show_images(outputs[0]["images"], outputs[0]["preds"],
-                    f'{self.version_path}/images/recon{self.current_epoch}val.png', num_out=5)
+                    f'{self.version_path}/images/recon{self.n_updates}val.png', num_out=5)
 
     def test_step(self, batch, batch_idx):
         """

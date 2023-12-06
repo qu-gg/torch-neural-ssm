@@ -56,9 +56,9 @@ if __name__ == '__main__':
             checkpoint_callback
         ],
         deterministic=True,
-        max_epochs=args.num_epochs,
+        max_steps=args.num_steps * args.batch_size,
         gradient_clip_val=5.0,
-        check_val_every_n_epoch=10,
+        val_check_interval=1000,
         num_sanity_val_steps=0,
         auto_select_gpus=True
     )
