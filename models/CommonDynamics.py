@@ -301,8 +301,8 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         images, states, labels, preds, embeddings = self.get_step_outputs(batch, self.args.gen_len['test'])
 
         # Build output dictionary
-        out = {"states": states.detach(), "embeddings": embeddings.detach(),
-               "preds": preds.detach(), "images": images.detach(), "labels": labels.detach()}
+        out = {"states": states.detach().cpu(), "embeddings": embeddings.detach().cpu(),
+               "preds": preds.detach().cpu(), "images": images.detach().cpu(), "labels": labels.detach().cpu()}
         return out
 
     def test_epoch_end(self, batch_outputs):
@@ -314,7 +314,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         outputs = dict()
         for key in batch_outputs[0].keys():
             stack_method = torch.concatenate if key == "som_assignments" else torch.vstack
-            outputs[key] = stack_method([output[key] for output in batch_outputs]).cpu().numpy()
+            outputs[key] = stack_method([output[key] for output in batch_outputs]).numpy()
 
         # Iterate through each metric function and add to a dictionary
         out_metrics = {}

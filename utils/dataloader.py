@@ -31,7 +31,7 @@ class SSMDataModule(pytorch_lightning.LightningDataModule):
         super(SSMDataModule, self).__init__()
         self.args = args
 
-    def make_loader(self, mode="train", shuffle=True):
+    def make_loader(self, mode="train", evaluation=False, shuffle=True):
         # Load in NPZ
         npzfile = np.load(f"data/{self.args.dataset}/{mode}.npz")
 
@@ -59,16 +59,22 @@ class SSMDataModule(pytorch_lightning.LightningDataModule):
         # Build dataset and corresponding Dataloader
         dataset = SSMDataset(images, labels, states, controls)
 
-        if mode == "train":
+        # If it is the training setting, set up the iterative dataloader
+        if mode == "train" and evaluation is False:
             sampler = torch.utils.data.RandomSampler(dataset, replacement=True, num_samples=self.args.num_steps * self.args.batch_size)
             dataloader = DataLoader(dataset, sampler=sampler, batch_size=self.args.batch_size, drop_last=True)
+
+        # Otherwise, setup a normal dataloader
         else:
             dataloader = DataLoader(dataset, batch_size=self.args.batch_size, shuffle=shuffle)
         return dataloader
 
     def train_dataloader(self):
         """ Getter function that builds and returns the training dataloader """
-        return self.make_loader("train", shuffle=True)
+        return self.make_loader("train")
+
+    def evaluate_train_dataloader(self):
+        return self.make_loader("train", evaluation=True, shuffle=False)
 
     def val_dataloader(self):
         """ Getter function that builds and returns the validation dataloader """

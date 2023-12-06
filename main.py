@@ -57,6 +57,7 @@ if __name__ == '__main__':
         ],
         deterministic=True,
         max_steps=args.num_steps * args.batch_size,
+        max_epochs=1,
         gradient_clip_val=5.0,
         val_check_interval=1000,
         num_sanity_val_steps=0,
@@ -79,7 +80,7 @@ if __name__ == '__main__':
         else f"{args.model_path}/checkpoints/{find_best_epoch(args.model_path)[0]}"
 
     args.setting = 'train'
-    trainer.test(model, datamodule.train_dataloader(), ckpt_path=ckpt_path)
+    trainer.test(model, datamodule.evaluate_train_dataloader(), ckpt_path=ckpt_path)
 
     args.setting = 'val'
     trainer.test(model, datamodule.val_dataloader(), ckpt_path=ckpt_path)
