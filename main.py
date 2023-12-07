@@ -41,7 +41,7 @@ if __name__ == '__main__':
 
     # Callbacks for checkpointing and early stopping
     checkpoint_callback = ModelCheckpoint(monitor='val_reconstruction_mse',
-                                          filename='epoch{epoch:02d}-val_reconstruction_mse{val_reconstruction_mse:.4f}',
+                                          filename='step{step:02d}-val_reconstruction_mse{val_reconstruction_mse:.4f}',
                                           auto_insert_metric_name=False, save_last=True)
     early_stop_callback = EarlyStopping(monitor="val_reconstruction_mse", min_delta=0.000001, patience=15, mode="min")
     lr_monitor = LearningRateMonitor(logging_interval='step')
