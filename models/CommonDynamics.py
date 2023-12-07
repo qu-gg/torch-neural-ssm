@@ -7,7 +7,6 @@ Holds the training + validation step logic and the VAE components for reconstruc
 import os
 import json
 import torch
-import shutil
 import numpy as np
 import torch.nn as nn
 import pytorch_lightning
@@ -21,21 +20,17 @@ from utils.utils import determine_annealing_factor, CosineAnnealingWarmRestartsW
 
 
 class LatentDynamicsModel(pytorch_lightning.LightningModule):
-    def __init__(self, args, top, exptop):
+    def __init__(self, args):
         """
         Generic implementation of a Latent Dynamics Model
         Holds the training and testing boilerplate, as well as experiment tracking
         :param args: passed in user arguments
-        :param top: top lightning log version
-        :param exptop: top experiment folder version
         """
         super().__init__()
         self.save_hyperparameters(args)
 
         # Args
         self.args = args
-        self.top = top
-        self.exptop = exptop
 
         # Encoder + Decoder
         self.encoder = LatentStateEncoder(args)
@@ -80,7 +75,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
 
         For CosineAnnealing, we set the LR bounds to be [LR * 1e-2, LR]
         """
-        optim = torch.optim.AdamW(self.parameters(), lr=self.args.learning_rate)
+        optim = torch.optim.AdamW(self.parameters(), lr=self.args.learning_rate, weight_decay=1.0)
 
         # Build the scheduler if using it
         if self.args.use_scheduler is True:
@@ -109,18 +104,12 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         Before a training session starts, we set some model variables and save a JSON configuration of the
         used hyper-parameters to allow for easy load-in at test-time.
         """
-        # Get local version path from absolute directory
-        self.version_path = f"{os.path.abspath('')}/lightning_logs/version_{self.top}/"
-
         # Get total number of parameters for the model and save
         self.log("total_num_parameters", float(sum(p.numel() for p in self.parameters() if p.requires_grad)), prog_bar=False)
 
-        # Save config file to the version path
-        shutil.copy(f"{self.args.config_path}", f"{self.version_path}/")
-
         # Make image dir in lightning experiment folder if it doesn't exist
-        if not os.path.exists(f"{self.version_path}/images/"):
-            os.mkdir(f"{self.version_path}/images/")
+        if not os.path.exists(f"{self.logger.log_dir}/images/"):
+            os.mkdir(f"{self.logger.log_dir}/images/")
 
     def get_step_outputs(self, batch, generation_len):
         """
@@ -219,34 +208,26 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
 
         # Return outputs as dict
         self.n_updates += 1
-        out = {"loss": loss, "labels": labels.detach()}
-        if len(self.outputs) < self.args.batches_to_save:
-            out["preds"] = preds.detach()
-            out["images"] = images.detach()
-            self.outputs.append(out)
+        out = {"loss": loss, "labels": labels.detach(), "preds": preds.detach(), "images": images.detach()}
+        self.outputs.append(out)
         return out
 
     def on_train_batch_end(self, outputs, batch, batch_idx):
         """ Given the iterative training, check on every batch's end whether it is evaluation time or not """
-        if batch_idx % 2500 == 0 and batch_idx != 0:
+        if batch_idx % self.args.log_interval == 0 and batch_idx != 0:
             # Log epoch metrics on saved batches
             metrics = self.get_epoch_metrics(self.outputs[:self.args.batches_to_save], setting='train')
             for metric in metrics.keys():
                 self.log(f"train_{metric}", metrics[metric], prog_bar=True)
 
-            # Show side-by-side reconstructions
-            show_images(self.outputs[0]["images"], self.outputs[0]["preds"],
-                        f'{self.version_path}/images/recon{batch_idx}train.png', num_out=5)
+            # Every 10 windows of updates, get images from train
+            if batch_idx % (self.args.log_interval * 10) == 0 and batch_idx != 0:
+                # Show side-by-side reconstructions
+                show_images(self.outputs[0]["images"], self.outputs[0]["preds"],
+                            f'{self.logger.log_dir}/images/recon{batch_idx}train.png', num_out=5)
 
-            # Get per-dynamics plots
-            self.model_specific_plotting(self.version_path, self.outputs)
-
-            # Copy experiment to relevant folder
-            if self.args.exptype is not None:
-                shutil.copytree(
-                    self.version_path, f"experiments/{self.args.exptype}/{self.args.model}/version_{self.exptop}",
-                    dirs_exist_ok=True
-                )
+                # Get per-dynamics plots
+                self.model_specific_plotting(self.logger.log_dir, self.outputs)
 
             # Clear out the old cache
             self.outputs = list()
@@ -288,7 +269,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
 
         # Get image reconstructions
         show_images(outputs[0]["images"], outputs[0]["preds"],
-                    f'{self.version_path}/images/recon{self.n_updates}val.png', num_out=5)
+                    f'{self.logger.log_dir}/images/recon{self.n_updates}val.png', num_out=5)
 
     def test_step(self, batch, batch_idx):
         """
@@ -325,7 +306,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
             print(f"=> {met}: {metric_mean:4.5f}+-{metric_std:4.5f}")
 
         # Set up output path and create dir
-        output_path = f"{self.args.model_path}/test_{self.args.setting}"
+        output_path = f"{self.logger.log_dir}/test_{self.args.setting}"
         if not os.path.exists(output_path):
             os.mkdir(output_path)
 

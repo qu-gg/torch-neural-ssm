@@ -137,81 +137,14 @@ def get_act(act="relu"):
         return None
 
 
-def get_exp_versions(model, exptype):
-    """ Return the version number for the latest lightning log and experiment num """
-    # Find version folder path
-    top = 0
-    for folder in os.listdir("lightning_logs/"):
-        try:
-            num = int(folder.split("_")[-1])
-            top = num if num > top else top
-        except ValueError:
-            continue
-
-    top += 1
-    print("Lightning Log V{}".format(top))
-
-    # Set up paths if they don't exist
-    if not os.path.exists("experiments/"):
-        os.mkdir("experiments/")
-
-    if not os.path.exists("experiments/{}".format(exptype)):
-        os.mkdir("experiments/{}/".format(exptype))
-
-    if not os.path.exists("experiments/{}/{}".format(exptype, model)):
-        os.mkdir("experiments/{}/{}".format(exptype, model))
-
-    # Find version folder path
-    exptop = 0
-    for folder in os.listdir("experiments/{}/{}/".format(exptype, model)):
-        try:
-            num = int(folder.split("_")[-1])
-            exptop = num if num > exptop else exptop
-        except ValueError:
-            continue
-
-    exptop += 1
-    print("Experiment V{}".format(exptop))
-    return top, exptop
-
-
-def get_model_paths(args):
-    """ Build the model folder path for a given model from its config args """
-    model_path = ""
-
-    # Get latest version number folder for experiment if none given
-    if args.model_path in ["None", ""]:
-        # Find version folder path
-        exptop = 0
-
-        if len(os.listdir(f"experiments/{args.exptype}/{args.model}/")) == 0:
-            exptop += 1
-        else:
-            for folder in os.listdir(f"experiments/{args.exptype}/{args.model}/"):
-                try:
-                    num = int(folder.split("_")[-1])
-                    exptop = num if num > exptop else exptop
-                except ValueError:
-                    continue
-
-            exptop += 1
-
-        model_path += f"experiments/{args.exptype}/{args.model}/version_{exptop}/"
-    else:
-        model_path += f"{args.model_path}"
-
-    print(f"=> Built Model Path: {model_path}")
-    return model_path
-
-
-def find_best_epoch(ckpt_folder):
+def find_best_step(ckpt_folder):
     """
     Find the highest epoch in the Test Tube file structure.
     :param ckpt_folder: dir where the checpoints are being saved.
     :return: float of the highest epoch reached by the checkpoints.
     """
     best_ckpt = None
-    best_epoch = None
+    best_step = None
     best = np.inf
     filenames = os.listdir(f"{ckpt_folder}/checkpoints/")
     for filename in filenames:
@@ -219,13 +152,13 @@ def find_best_epoch(ckpt_folder):
             continue
 
         test_value = float(filename[:-5].split("mse")[-1])
-        test_epoch = int(filename.split('-')[0].replace('epoch', ''))
+        test_step = int(filename.split('-')[0].replace('step', ''))
         if test_value < best:
             best = test_value
             best_ckpt = filename
-            best_epoch = test_epoch
+            best_step = test_step
 
-    return best_ckpt, best_epoch
+    return best_ckpt, best_step
 
 
 def determine_annealing_factor(n_updates, min_anneal_factor=0.0, anneal_update=10000):
@@ -247,6 +180,21 @@ def determine_annealing_factor(n_updates, min_anneal_factor=0.0, anneal_update=1
     else:
         anneal_factor = 1.0
     return anneal_factor
+
+
+def strtobool(val):
+    """Convert a string representation of truth to true (1) or false (0).
+    True values are 'y', 'yes', 't', 'true', 'on', and '1'; false values
+    are 'n', 'no', 'f', 'false', 'off', and '0'.
+    Raises ValueError if 'val' is anything else.
+    """
+    val = val.lower()
+    if val in ('y', 'yes', 't', 'true', 'on', '1', 'True',  'T',  'true'):
+        return True
+    elif val in ('n', 'no', 'f', 'false', 'off', '0', 'False', 'F', 'false'):
+        return False
+    else:
+        raise ValueError("invalid truth value %r" % (val,))
 
 
 class CosineAnnealingWarmRestartsWithDecayAndLinearWarmup(_LRScheduler):
@@ -326,18 +274,3 @@ class CosineAnnealingWarmRestartsWithDecayAndLinearWarmup(_LRScheduler):
                 self.print_lr(self.verbose, i, lr, epoch)
 
         self._last_lr = [group['lr'] for group in self.optimizer.param_groups]
-
-
-def strtobool(val):
-    """Convert a string representation of truth to true (1) or false (0).
-    True values are 'y', 'yes', 't', 'true', 'on', and '1'; false values
-    are 'n', 'no', 'f', 'false', 'off', and '0'.
-    Raises ValueError if 'val' is anything else.
-    """
-    val = val.lower()
-    if val in ('y', 'yes', 't', 'true', 'on', '1', 'True',  'T',  'true'):
-        return True
-    elif val in ('n', 'no', 'f', 'false', 'off', '0', 'False', 'F', 'false'):
-        return False
-    else:
-        raise ValueError("invalid truth value %r" % (val,))

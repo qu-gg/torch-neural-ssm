@@ -1,1 +1,0 @@
-Placeholder version folder for the lightning_logs/ folder as version_0 can act weird.

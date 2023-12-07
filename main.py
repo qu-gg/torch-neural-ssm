@@ -4,12 +4,12 @@
 Main entrypoint for the training and testing environments. Takes in a configuration file
 of arguments and either trains a model or tests a given model and checkpoint.
 """
-import shutil
 import argparse
 import pytorch_lightning
+import pytorch_lightning.loggers as pl_loggers
 
 from utils.dataloader import SSMDataModule
-from utils.utils import parse_args, get_exp_versions, get_model_paths, strtobool, find_best_epoch
+from utils.utils import parse_args, strtobool, find_best_step
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, LearningRateMonitor
 
 
@@ -26,18 +26,14 @@ if __name__ == '__main__':
     # Parse the config file and get the model function used
     args, model_type = parse_args(parser)
 
-    # Get version numbers
-    global top, exptop
-    top, exptop = get_exp_versions(args.model, args.exptype)
-
-    # Build the model path if not given
-    args.model_path = get_model_paths(args)
-
     # Building the PL-DataModule for all splits
     datamodule = SSMDataModule(args=args)
 
     # Initialize model
-    model = model_type(args, top, exptop)
+    model = model_type(args)
+
+    # Tensorboard Logger
+    tb_logger = pl_loggers.TensorBoardLogger(save_dir=f"experiments/{args.exptype}/{args.model}/")
 
     # Callbacks for checkpointing and early stopping
     checkpoint_callback = ModelCheckpoint(monitor='val_reconstruction_mse',
@@ -50,7 +46,7 @@ if __name__ == '__main__':
     trainer = pytorch_lightning.Trainer.from_argparse_args(
         args,
         callbacks=[
-            early_stop_callback,
+            # early_stop_callback,
             lr_monitor,
             checkpoint_callback
         ],
@@ -58,9 +54,10 @@ if __name__ == '__main__':
         max_steps=args.num_steps * args.batch_size,
         max_epochs=1,
         gradient_clip_val=5.0,
-        val_check_interval=1000,
+        val_check_interval=250,
         num_sanity_val_steps=0,
-        auto_select_gpus=True
+        auto_select_gpus=True,
+        logger=tb_logger
     )
 
     # Training from scratch
@@ -69,14 +66,14 @@ if __name__ == '__main__':
 
     # Training from the last epoch
     elif args.train is True and args.resume is True:
-        ckpt_path = args.model_path + "/checkpoints/" + args.checkpt if args.checkpt != "None" \
-            else f"{args.model_path}/checkpoints/last.ckpt"
+        ckpt_path = tb_logger.log_dir + "/checkpoints/" + args.checkpt if args.checkpt != "None" \
+            else f"{tb_logger.log_dir}/checkpoints/last.ckpt"
 
         trainer.fit(model, datamodule, ckpt_path=ckpt_path)
 
     # Testing the model on each split
-    ckpt_path = args.model_path + "/checkpoints/" + args.checkpt if args.checkpt not in ["", "None"] \
-        else f"{args.model_path}/checkpoints/{find_best_epoch(args.model_path)[0]}"
+    ckpt_path = tb_logger.log_dir + "/checkpoints/" + args.checkpt if args.checkpt not in ["", "None"] \
+        else f"{tb_logger.log_dir}/checkpoints/{find_best_step(tb_logger.log_dir)[0]}"
 
     args.setting = 'train'
     trainer.test(model, datamodule.evaluate_train_dataloader(), ckpt_path=ckpt_path)
@@ -86,6 +83,3 @@ if __name__ == '__main__':
 
     args.setting = 'test'
     trainer.test(model, datamodule.test_dataloader(), ckpt_path=ckpt_path)
-
-    # Delete the lightning log
-    shutil.rmtree(f"lightning_logs/version_{top}/")
