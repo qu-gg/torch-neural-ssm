@@ -4,7 +4,7 @@
   // and what the default parameters and types are for each.
 
   // Experiment ID and Checkpoint to Load
-  "exptype": "str (default=testing): experiment folder name",
+  "expname": "str (default=testing): experiment folder name",
   "model_path": "str (default=''): path to the experiments folder",
   "checkpt": "str (default=''): checkpoint name to use",
   "accelerator": "str (default='gpu') whether to use cpu, gpu, tpu",

@@ -1,5 +1,5 @@
 {
-  "exptype": "testing",
+  "expname": "testing",
   "model_path": "",
   "checkpt": "",
   "accelerator": "gpu",
@@ -29,6 +29,8 @@
   "save_files": false,
 
   "num_steps": 250000,
+  "log_interval": 250,
+  "val_log_interval": 2500,
   "batch_size": 32,
 
   "learning_rate": 1e-3,

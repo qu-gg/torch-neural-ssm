@@ -33,7 +33,7 @@ if __name__ == '__main__':
     model = model_type(args)
 
     # Tensorboard Logger
-    tb_logger = pl_loggers.TensorBoardLogger(save_dir=f"experiments/{args.exptype}/{args.model}/")
+    tb_logger = pl_loggers.TensorBoardLogger(save_dir=f"experiments/{args.expname}/", name=f"{args.model}")
 
     # Callbacks for checkpointing and early stopping
     checkpoint_callback = ModelCheckpoint(monitor='val_reconstruction_mse',
@@ -54,7 +54,7 @@ if __name__ == '__main__':
         max_steps=args.num_steps * args.batch_size,
         max_epochs=1,
         gradient_clip_val=5.0,
-        val_check_interval=250,
+        val_check_interval=args.val_log_interval,
         num_sanity_val_steps=0,
         auto_select_gpus=True,
         logger=tb_logger
