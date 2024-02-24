@@ -1,0 +1,22 @@
+defaults:
+  - _self_
+  - model: node
+  - dataset: bouncingball_10000samples_75steps
+  - training: default
+
+hydra:
+  output_subdir: null
+  run:
+    dir: .
+
+# Experiment folder naming
+expname: test
+model_path: ""
+checkpt: ""
+
+# For training, overrideable by cmd
+train: true
+resume: false
+
+# Whether to save reconstructions to disk
+save_files: false

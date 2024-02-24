@@ -128,9 +128,9 @@ if __name__ == '__main__':
     # Parameters of generation, resolution and number of samples
     scale = 1
     timesteps = 75
-    training_size = 3000
+    training_size = 10000
     validation_size = 1500
-    testing_size = 1500
+    testing_size = 2500
 
     base_dir = f"bouncingball_{training_size}samples_{timesteps}steps/"
 
@@ -146,8 +146,7 @@ if __name__ == '__main__':
                       radius=4, angle_limits=(0, 360), velocity_limits=(5.0, 10.0), save='npz')
 
     # Setting the pixels to a uniform background and foreground (for simplicity of training)
-    i[i > 0] = 1
-    i[i == 0] = 0.32
+    i = (i > 0).astype(np.float32)
 
     # Break into train and test sets, adding in generic labels
     train_images = i[:training_size]

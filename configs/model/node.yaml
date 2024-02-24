@@ -1,0 +1,10 @@
+model_type: node
+stochastic: true
+system_identification: true
+
+integrator: rk4
+integrator_params:
+  step_size: 0.5
+
+defaults:
+  - architecture: default

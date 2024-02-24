@@ -5,32 +5,10 @@ Utility functions across files
 """
 import os
 import math
-import json
 import numpy as np
 import torch.nn as nn
-import pytorch_lightning
 
 from torch.optim.lr_scheduler import _LRScheduler
-
-
-def parse_args(parser):
-    """
-    Parse the cmd for a given configuration file and updates the arguments with its content
-    As well, given the arguments, gets which model dynamics function is being used.
-    :return: parsed arguments and model class
-    """
-    # Parse cmd line args
-    parser = pytorch_lightning.Trainer.add_argparse_args(parser)
-    args = parser.parse_args()
-
-    # Load in config file and update parser
-    with open(parser.parse_args().config_path, 'rt') as f:
-        args.__dict__.update(json.load(f))
-
-    # Get the model type from args and add its specific arguments
-    model_type = get_model(args.model, args.system_identification)
-    args.__dict__.update(model_type.get_model_specific_args())
-    return args, model_type
 
 
 def get_model(name, system_identification):

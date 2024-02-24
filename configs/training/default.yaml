@@ -1,0 +1,39 @@
+# PyTorch-Lightning hardware params
+accelerator: gpu
+devices: [0]
+num_workers: 0
+
+# Number of steps per task
+num_steps: 25000
+log_interval: 50
+val_log_interval: 50
+
+# What metrics to evaluate on
+metrics:
+  - vpt
+  - reconstruction_mse
+  - extrapolation_mse
+
+# Batch size
+batch_size: 64
+
+# Learning rate and cosine annealing scheduler
+learning_rate: 1e-3
+scheduler:
+  use: true
+  restart_interval: 5000
+  warmup_steps: 200
+  decay: 0.90
+
+# KL loss betas
+betas:
+  z0: 1e-2
+  kl: 1e-3
+
+# How many steps are given for inference and to generate
+z_amort: 5
+gen_len:
+  varying: false
+  train: 20
+  val: 30
+  test: 30
