@@ -10,23 +10,27 @@ import pytorch_lightning.loggers as pl_loggers
 
 from omegaconf import DictConfig
 from utils.dataloader import SSMDataModule
-from utils.utils import find_best_step, get_model
+from utils.utils import find_best_step, get_model, flatten_cfg
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, LearningRateMonitor
 
 
 @hydra.main(version_base="1.3", config_path="configs", config_name="config")
 def main(cfg: DictConfig):
+    # Flatten the cfg down a level
+    cfg.expname = cfg.expname
+    cfg = flatten_cfg(cfg)
+
     # Set a consistent seed over the full set for consistent analysis
-    pytorch_lightning.seed_everything(125125125, workers=True)
+    pytorch_lightning.seed_everything(cfg.seed, workers=True)
 
     # Building the PL-DataModule for all splits
     datamodule = SSMDataModule(cfg=cfg)
 
     # Initialize model type and initialize
-    model = get_model(cfg.model.model_type, cfg.model.system_identification)(cfg)
+    model = get_model(cfg.model_type, cfg.system_identification)(cfg)
 
     # Tensorboard Logger
-    tb_logger = pl_loggers.TensorBoardLogger(save_dir=f"experiments/{cfg.expname}/", name=f"{cfg.model.model_type}")
+    tb_logger = pl_loggers.TensorBoardLogger(save_dir=f"experiments/{cfg.expname}/", name=f"{cfg.model_type}")
 
     # Callbacks for checkpointing and early stopping
     checkpoint_callback = ModelCheckpoint(monitor='val_reconstruction_mse',
@@ -42,12 +46,12 @@ def main(cfg: DictConfig):
             lr_monitor,
             checkpoint_callback
         ],
-        accelerator=cfg.training.accelerator,
+        accelerator=cfg.accelerator,
         deterministic=True,
-        max_steps=cfg.training.num_steps * cfg.training.batch_size,
+        max_steps=cfg.num_steps * cfg.batch_size,
         max_epochs=1,
         gradient_clip_val=5.0,
-        val_check_interval=cfg.training.val_log_interval,
+        val_check_interval=cfg.metric_interval,
         num_sanity_val_steps=0,
         auto_select_gpus=True,
         logger=tb_logger

@@ -4,9 +4,11 @@ devices: [0]
 num_workers: 0
 
 # Number of steps per task
-num_steps: 25000
-log_interval: 50
-val_log_interval: 50
+num_steps: 50001
+
+# How often to log metrics and how often to save image reconstructions
+metric_interval: 50
+image_interval: 500
 
 # What metrics to evaluate on
 metrics:

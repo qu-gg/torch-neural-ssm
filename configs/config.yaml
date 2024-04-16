@@ -9,8 +9,11 @@ hydra:
   run:
     dir: .
 
+# Random seed of the run
+seed: 125125125
+
 # Experiment folder naming
-expname: test
+expname: ${seed}seed_${dataset.dataset}_${training.num_steps}iterations_${model.model_type}
 model_path: ""
 checkpt: ""
 
@@ -19,4 +22,4 @@ train: true
 resume: false
 
 # Whether to save reconstructions to disk
-save_files: false
+save_files: true

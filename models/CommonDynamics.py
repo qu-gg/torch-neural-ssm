@@ -37,7 +37,6 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
 
         # Recurrent dynamics function
         self.dynamics_func = None
-        self.dynamics_out = None
 
         # Number of steps for training
         self.n_updates = 0
@@ -45,6 +44,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         # Loss function
         self.reconstruction_loss = nn.MSELoss(reduction='none')
 
+        # Variable to hold batch outputs to manually log
         self.outputs = list()
 
     def forward(self, x, generation_len):
@@ -69,16 +69,16 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
 
         For CosineAnnealing, we set the LR bounds to be [LR * 1e-2, LR]
         """
-        optim = torch.optim.AdamW(self.parameters(), lr=self.cfg.training.learning_rate, weight_decay=1.0)
+        optim = torch.optim.AdamW(self.parameters(), lr=self.cfg.learning_rate, weight_decay=1.0)
 
         # Build the scheduler if using it
-        if self.cfg.training.scheduler.use is True:
+        if self.cfg.scheduler.use is True:
             scheduler = CosineAnnealingWarmRestartsWithDecayAndLinearWarmup(
                 optim,
-                T_0=self.cfg.training.scheduler.restart_interval, T_mult=1,
-                eta_min=self.cfg.training.learning_rate * 1e-2,
-                warmup_steps=self.cfg.training.scheduler.warmup_steps,
-                decay=self.cfg.training.scheduler.decay
+                T_0=self.cfg.scheduler.restart_interval, T_mult=1,
+                eta_min=self.cfg.learning_rate * 1e-2,
+                warmup_steps=self.cfg.scheduler.warmup_steps,
+                decay=self.cfg.scheduler.decay
             )
 
             # Explicit dictionary to state how often to ping the scheduler
@@ -117,18 +117,17 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         _, images, states, controls, labels = batch
 
         # Same random portion of the sequence over generation_len, saving room for backwards solving
-        random_start = np.random.randint(generation_len, images.shape[1] - self.cfg.training.z_amort - generation_len)
-
-        # Get forward sequences
-        images = images[:, random_start:random_start + generation_len + self.cfg.training.z_amort]
-        states = states[:, random_start:random_start + generation_len + self.cfg.training.z_amort]
+        if max(images.shape[1] - self.cfg.z_amort - generation_len, 0) > 0:
+            random_start = np.random.randint(0, images.shape[1] - self.cfg.z_amort - generation_len)
+            images = images[:, random_start:random_start + generation_len + self.cfg.z_amort]
+            states = states[:, random_start:random_start + generation_len + self.cfg.z_amort]
 
         # Get predictions
         preds, embeddings = self(images, generation_len)
 
         # Restrict images to start from after inference, for metrics and likelihood
-        images = images[:, self.cfg.training.z_amort:]
-        states = states[:, self.cfg.training.z_amort:]
+        images = images[:, self.cfg.z_amort:]
+        states = states[:, self.cfg.z_amort:]
         return images, states, labels, preds, embeddings
 
     def get_step_losses(self, images, preds):
@@ -162,7 +161,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
 
         # Iterate through each metric function and add to a dictionary
         out_metrics = {}
-        for met in self.cfg.training.metrics:
+        for met in self.cfg.metrics:
             metric_function = getattr(metrics, met)
             out_metrics[met] = metric_function(images, preds, cfg=self.cfg, setting=setting)[0]
 
@@ -177,8 +176,8 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         :param batch_idx: how far in the epoch this batch is
         """
         # Get the generation length - either fixed or random between [1,T] depending on flags
-        generation_len = np.random.randint(1, self.cfg.training.gen_len['train']) \
-            if self.cfg.training.gen_len['varying'] is True else self.cfg.training.gen_len['train']
+        generation_len = np.random.randint(1, self.cfg.gen_len['train']) \
+            if self.cfg.gen_len['varying'] is True else self.cfg.gen_len['train']
 
         # Get model outputs from batch
         images, states, labels, preds, embeddings = self.get_step_outputs(batch, generation_len)
@@ -190,40 +189,40 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         kl_factor = determine_annealing_factor(self.n_updates, anneal_update=1000)
 
         # Build the full loss
-        loss = likelihood + kl_factor * ((self.cfg.training.betas.z0 * klz) + (self.cfg.training.betas.kl * dynamics_loss))
+        loss = likelihood + kl_factor * ((self.cfg.betas.z0 * klz) + (self.cfg.betas.kl * dynamics_loss))
 
         # Log ELBO loss terms
         self.log_dict({
             "likelihood": likelihood,
-            "kl_z": self.cfg.training.betas.z0 * klz,
-            "dynamics_loss": self.cfg.training.betas.kl * dynamics_loss,
+            "kl_z": self.cfg.betas.z0 * klz,
+            "dynamics_loss": self.cfg.betas.kl * dynamics_loss,
             "kl_factor": kl_factor
         })
 
-        # Return outputs as dict
+        # Log metrics every N batches
+        if len(self.outputs) < self.cfg.batches_to_save:
+            self.outputs.append({"loss": loss, "labels": labels.detach(), "preds": preds.detach(), "images": images.detach()})
+
+        # Return the loss for updating and track the iteration number
         self.n_updates += 1
-        out = {"loss": loss, "labels": labels.detach(), "preds": preds.detach(), "images": images.detach()}
-        self.outputs.append(out)
-        return out
+        return {"loss": loss}
 
     def on_train_batch_end(self, outputs, batch, batch_idx):
         """ Given the iterative training, check on every batch's end whether it is evaluation time or not """
-        if batch_idx % self.cfg.training.log_interval == 0 and batch_idx != 0:
-            # Log epoch metrics on saved batches
-            metrics = self.get_epoch_metrics(self.outputs[:self.cfg.dataset.batches_to_save], setting='train')
+        # Show side-by-side reconstructions
+        if batch_idx % self.cfg.image_interval == 0 and batch_idx != 0:
+            show_images(self.outputs[0]["images"], self.outputs[0]["preds"],
+                        f'{self.logger.log_dir}/images/recon{batch_idx}train.png', num_out=5)
+
+            # Get per-dynamics plots
+            self.model_specific_plotting(self.logger.log_dir, self.outputs)
+
+        # Get metrics over the window of batches and clear output buffer
+        if batch_idx % self.cfg.metric_interval == 0 and batch_idx != 0:
+            metrics = self.get_epoch_metrics(self.outputs[:self.cfg.batches_to_save], setting='train')
             for metric in metrics.keys():
                 self.log(f"train_{metric}", metrics[metric], prog_bar=True)
 
-            # Every 10 windows of updates, get images from train
-            if batch_idx % (self.cfg.training.log_interval * 10) == 0 and batch_idx != 0:
-                # Show side-by-side reconstructions
-                show_images(self.outputs[0]["images"], self.outputs[0]["preds"],
-                            f'{self.logger.log_dir}/images/recon{batch_idx}train.png', num_out=5)
-
-                # Get per-dynamics plots
-                self.model_specific_plotting(self.logger.log_dir, self.outputs)
-
-            # Clear out the old cache
             self.outputs = list()
 
     def validation_step(self, batch, batch_idx):
@@ -233,7 +232,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         :param batch_idx: how far in the epoch this batch is
         """
         # Get model outputs from batch
-        images, states, labels, preds, embeddings = self.get_step_outputs(batch, self.cfg.training.gen_len['val'])
+        images, states, labels, preds, embeddings = self.get_step_outputs(batch, self.cfg.gen_len['val'])
 
         # Get model loss terms for the step
         likelihood, klz, dynamics_loss = self.get_step_losses(images, preds)
@@ -246,7 +245,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
 
         # Return outputs as dict
         out = {"loss": loss}
-        if batch_idx < self.cfg.dataset.batches_to_save:
+        if batch_idx < self.cfg.batches_to_save:
             out["preds"] = preds.detach()
             out["images"] = images.detach()
         return out
@@ -257,13 +256,14 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         :param outputs: list of outputs from the validation steps at batch 0
         """
         # Log epoch metrics on saved batches
-        metrics = self.get_epoch_metrics(outputs[:self.cfg.dataset.batches_to_save], setting='val')
+        metrics = self.get_epoch_metrics(outputs[:self.cfg.batches_to_save], setting='val')
         for metric in metrics.keys():
             self.log(f"val_{metric}", metrics[metric], prog_bar=True)
 
         # Get image reconstructions
-        show_images(outputs[0]["images"], outputs[0]["preds"],
-                    f'{self.logger.log_dir}/images/recon{self.n_updates}val.png', num_out=5)
+        if self.n_updates % self.cfg.image_interval == 0 and self.n_updates != 0:
+            show_images(outputs[0]["images"], outputs[0]["preds"],
+                        f'{self.logger.log_dir}/images/recon{self.n_updates}val.png', num_out=5)
 
     def test_step(self, batch, batch_idx):
         """
@@ -272,7 +272,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
         :param batch_idx: how far in the epoch this batch is
         """
         # Get model outputs from batch
-        images, states, labels, preds, embeddings = self.get_step_outputs(batch, self.cfg.training.gen_len['test'])
+        images, states, labels, preds, embeddings = self.get_step_outputs(batch, self.cfg.gen_len['test'])
 
         # Build output dictionary
         out = {"states": states.detach().cpu(), "embeddings": embeddings.detach().cpu(),
@@ -292,7 +292,7 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
 
         # Iterate through each metric function and add to a dictionary
         out_metrics = {}
-        for met in self.cfg.training.metrics:
+        for met in self.cfg.metrics:
             metric_function = getattr(metrics, met)
             metric_mean, metric_std = metric_function(outputs["images"], outputs["preds"], cfg=self.cfg, setting='test')
             out_metrics[f"{met}_mean"], out_metrics[f"{met}_std"] = float(metric_mean), float(metric_std)
@@ -335,5 +335,5 @@ class LatentDynamicsModel(pytorch_lightning.LightningModule):
 
         # Save metrics to an easy excel conversion style
         with open(f"{output_path}/test_{self.setting}_excel.txt", 'w') as f:
-            for metric in self.cfg.training.metrics:
+            for metric in self.cfg.metrics:
                 f.write(f"{out_metrics[f'{metric}_mean']:0.3f}({out_metrics[f'{metric}_std']:0.3f}),")

@@ -406,7 +406,9 @@ The project's folder structure is as follows:
 <a name="data"></a>
 ## Data
 
-All data used throughout these experiments are available for download <a href="">here</a> on Google Drive, in which they already come in their WebDataset forms. The total sizes of all sets are under a modest 2GB. However, feel free to generate your own sets using the provided data scripts!
+All data used throughout these experiments are available for download <a href="">https://drive.google.com/drive/folders/1LEasIos71026lMnva2--U-DQXAaOI1mh?usp=sharing</a> on Google Drive, in which they already come in their .npz forms. Feel free to generate your own sets using the provided data scripts!
+
+<b>The following section is under WIP as I update it from WebDataset to a more standard NPZ format.</b>
 
 <b>Hamiltonian Dynamics</b>: Provided for evaluation are a <a href="https://github.com/webdataset/webdataset">WebDataset</a> dataloader and generation scripts for DeepMind's Hamiltonian Dynamics
 <a href="https://github.com/deepmind/dm_hamiltonian_dynamics_suite">suite</a><sup>[4]</sup>, a simulation library for 17 different physics datasets that have known underlying Hamiltonian dynamics.

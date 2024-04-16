@@ -20,23 +20,23 @@ class LatentStateEncoder(nn.Module):
         super(LatentStateEncoder, self).__init__()
         self.cfg = cfg
 
-        # Encoder, q(z_0 | x_{0:cfg.model.architecture.z_amort})
+        # Encoder, q(z_0 | x_{0:cfg.architecture.z_amort})
         self.initial_encoder = nn.Sequential(
-            nn.Conv2d(cfg.training.z_amort, cfg.model.architecture.num_filters, kernel_size=5, stride=2, padding=(2, 2)),  # 14,14
-            nn.BatchNorm2d(cfg.model.architecture.num_filters),
+            nn.Conv2d(cfg.z_amort, cfg.architecture.num_filters, kernel_size=5, stride=2, padding=(2, 2)),  # 14,14
+            nn.BatchNorm2d(cfg.architecture.num_filters),
             nn.ReLU(),
-            nn.Conv2d(cfg.model.architecture.num_filters, cfg.model.architecture.num_filters * 2, kernel_size=5, stride=2, padding=(2, 2)),  # 7,7
-            nn.BatchNorm2d(cfg.model.architecture.num_filters * 2),
+            nn.Conv2d(cfg.architecture.num_filters, cfg.architecture.num_filters * 2, kernel_size=5, stride=2, padding=(2, 2)),  # 7,7
+            nn.BatchNorm2d(cfg.architecture.num_filters * 2),
             nn.ReLU(),
-            nn.Conv2d(cfg.model.architecture.num_filters * 2, cfg.model.architecture.num_filters * 4, kernel_size=5, stride=2, padding=(2, 2)),
-            nn.BatchNorm2d(cfg.model.architecture.num_filters * 4),
+            nn.Conv2d(cfg.architecture.num_filters * 2, cfg.architecture.num_filters * 4, kernel_size=5, stride=2, padding=(2, 2)),
+            nn.BatchNorm2d(cfg.architecture.num_filters * 4),
             nn.ReLU(),
             nn.AvgPool2d(4),
             Flatten()
         )
 
-        self.stochastic_out = Gaussian(cfg.model.architecture.num_filters * 4, cfg.model.architecture.latent_dim)
-        self.deterministic_out = nn.Linear(cfg.model.architecture.num_filters * 4, cfg.model.architecture.latent_dim)
+        self.stochastic_out = Gaussian(cfg.architecture.num_filters * 4, cfg.architecture.latent_dim)
+        self.deterministic_out = nn.Linear(cfg.architecture.num_filters * 4, cfg.architecture.latent_dim)
         self.out_act = nn.Tanh()
 
         # Holds generated z0 means and logvars for use in KL calculations
@@ -48,7 +48,7 @@ class LatentStateEncoder(nn.Module):
         KL Z term, KL[q(z0|X) || N(0,1)]
         :return: mean klz across batch
         """
-        if self.cfg.model.stochastic is False:
+        if self.cfg.stochastic is False:
             return 0.0
 
         batch_size = self.z_means.shape[0]
@@ -67,10 +67,10 @@ class LatentStateEncoder(nn.Module):
         :param x: input sequences [BatchSize, GenerationLen * NumChannels, H, W]
         :return: z0 over the batch [BatchSize, LatentDim]
         """
-        z0 = self.initial_encoder(x[:, :self.cfg.training.z_amort])
+        z0 = self.initial_encoder(x[:, :self.cfg.z_amort])
 
         # Apply the Gaussian layer if stochastic version
-        if self.cfg.model.stochastic is True:
+        if self.cfg.stochastic is True:
             self.z_means, self.z_logvs, z0 = self.stochastic_out(z0)
         else:
             z0 = self.deterministic_out(z0)
@@ -88,25 +88,25 @@ class EmissionDecoder(nn.Module):
         self.cfg = cfg
 
         # Variable that holds the estimated output for the flattened convolution vector
-        self.conv_dim = cfg.model.architecture.num_filters * 4 ** 3
+        self.conv_dim = cfg.architecture.num_filters * 4 ** 3
 
         # Emission model handling z_i -> x_i
         self.decoder = nn.Sequential(
             # Transform latent vector into 4D tensor for deconvolution
-            nn.Linear(cfg.model.architecture.latent_dim, self.conv_dim),
+            nn.Linear(cfg.architecture.latent_dim, self.conv_dim),
             UnFlatten(4),
 
             # Perform de-conv to output space
-            nn.ConvTranspose2d(self.conv_dim // 16, cfg.model.architecture.num_filters * 4, kernel_size=4, stride=1, padding=(0, 0)),
-            nn.BatchNorm2d(cfg.model.architecture.num_filters * 4),
+            nn.ConvTranspose2d(self.conv_dim // 16, cfg.architecture.num_filters * 4, kernel_size=4, stride=1, padding=(0, 0)),
+            nn.BatchNorm2d(cfg.architecture.num_filters * 4),
             nn.ReLU(),
-            nn.ConvTranspose2d(cfg.model.architecture.num_filters * 4, cfg.model.architecture.num_filters * 2, kernel_size=5, stride=2, padding=(1, 1)),
-            nn.BatchNorm2d(cfg.model.architecture.num_filters * 2),
+            nn.ConvTranspose2d(cfg.architecture.num_filters * 4, cfg.architecture.num_filters * 2, kernel_size=5, stride=2, padding=(1, 1)),
+            nn.BatchNorm2d(cfg.architecture.num_filters * 2),
             nn.ReLU(),
-            nn.ConvTranspose2d(cfg.model.architecture.num_filters * 2, cfg.model.architecture.num_filters, kernel_size=5, stride=2, padding=(1, 1), output_padding=(1, 1)),
-            nn.BatchNorm2d(cfg.model.architecture.num_filters),
+            nn.ConvTranspose2d(cfg.architecture.num_filters * 2, cfg.architecture.num_filters, kernel_size=5, stride=2, padding=(1, 1), output_padding=(1, 1)),
+            nn.BatchNorm2d(cfg.architecture.num_filters),
             nn.ReLU(),
-            nn.ConvTranspose2d(cfg.model.architecture.num_filters, cfg.model.architecture.num_channels, kernel_size=5, stride=1, padding=(2, 2)),
+            nn.ConvTranspose2d(cfg.architecture.num_filters, cfg.architecture.num_channels, kernel_size=5, stride=1, padding=(2, 2)),
             nn.Sigmoid(),
         )
 
@@ -120,5 +120,5 @@ class EmissionDecoder(nn.Module):
         x_rec = self.decoder(zts.contiguous().view([zts.shape[0] * zts.shape[1], -1]))
 
         # Reshape to image output
-        x_rec = x_rec.view([zts.shape[0], x_rec.shape[0] // zts.shape[0], self.cfg.model.architecture.dim, self.cfg.model.architecture.dim])
+        x_rec = x_rec.view([zts.shape[0], x_rec.shape[0] // zts.shape[0], self.cfg.architecture.dim, self.cfg.architecture.dim])
         return x_rec

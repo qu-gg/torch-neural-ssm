@@ -8,7 +8,21 @@ import math
 import numpy as np
 import torch.nn as nn
 
+from omegaconf import DictConfig, OmegaConf
 from torch.optim.lr_scheduler import _LRScheduler
+
+
+def flatten_cfg(cfg: DictConfig):
+    """ Utility function to flatten the primary submodules of a Hydra config """
+    # Disable struct flag on the config
+    OmegaConf.set_struct(cfg, False)
+
+    # Loop through each item, merging with the main cfg if its another DictConfig
+    for key, value in cfg.copy().items():
+        if isinstance(value, DictConfig):
+            cfg.merge_with(cfg.pop(key))
+
+    return cfg
 
 
 def get_model(name, system_identification):
