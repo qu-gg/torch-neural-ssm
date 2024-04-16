@@ -406,7 +406,7 @@ The project's folder structure is as follows:
 <a name="data"></a>
 ## Data
 
-All data used throughout these experiments are available for download <a href="">https://drive.google.com/drive/folders/1LEasIos71026lMnva2--U-DQXAaOI1mh?usp=sharing</a> on Google Drive, in which they already come in their .npz forms. Feel free to generate your own sets using the provided data scripts!
+All data used throughout these experiments are available for download <a href="https://drive.google.com/drive/folders/1LEasIos71026lMnva2--U-DQXAaOI1mh?usp=sharing">here</a> on Google Drive, in which they already come in their .npz forms. Feel free to generate your own sets using the provided data scripts!
 
 <b>The following section is under WIP as I update it from WebDataset to a more standard NPZ format.</b>
 
