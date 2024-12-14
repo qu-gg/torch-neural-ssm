@@ -1,0 +1,5 @@
+model_type: vrnn
+stochastic: true
+
+defaults:
+  - architecture: default

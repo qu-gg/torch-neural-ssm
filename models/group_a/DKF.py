@@ -42,7 +42,7 @@ class RnnEncoder(nn.Module):
     ----------
     input_dim: int
         Dim. of inputs
-    rnn_dim: int
+    num_hidden: int
         Dim. of RNN hidden states
     n_layer: int
         Number of layers of RNN
@@ -52,16 +52,16 @@ class RnnEncoder(nn.Module):
         Use bi-directional RNN or not
     Returns
     -------
-    h_rnn: tensor (b, T_max, rnn_dim * n_direction)
+    h_rnn: tensor (b, T_max, num_hidden * n_direction)
         RNN hidden states at every time-step
     """
-    def __init__(self, args, input_dim, rnn_dim, n_layer=1, drop_rate=0.0, bd=False, nonlin='relu',
+    def __init__(self, cfg, input_dim, num_hidden, n_layer=1, drop_rate=0.0, bd=False, nonlin='relu',
                  rnn_type='rnn', orthogonal_init=False, reverse_input=True):
         super().__init__()
         self.n_direction = 1 if not bd else 2
-        self.args = args
+        self.cfg = cfg
         self.input_dim = input_dim
-        self.rnn_dim = rnn_dim
+        self.num_hidden = num_hidden
         self.n_layer = n_layer
         self.drop_rate = drop_rate
         self.bd = bd
@@ -72,13 +72,13 @@ class RnnEncoder(nn.Module):
             raise ValueError("`rnn_type` should be type str.")
         self.rnn_type = rnn_type
         if rnn_type == 'rnn':
-            self.rnn = nn.RNN(input_size=input_dim, hidden_size=rnn_dim, nonlinearity=nonlin,
+            self.rnn = nn.RNN(input_size=input_dim, hidden_size=num_hidden, nonlinearity=nonlin,
                               batch_first=True, bidirectional=bd, num_layers=n_layer, dropout=drop_rate)
         elif rnn_type == 'gru':
-            self.rnn = nn.GRU(input_size=input_dim, hidden_size=rnn_dim,
+            self.rnn = nn.GRU(input_size=input_dim, hidden_size=num_hidden,
                               batch_first=True, bidirectional=bd, num_layers=n_layer, dropout=drop_rate)
         elif rnn_type == 'lstm':
-            self.rnn = nn.LSTM(input_size=input_dim, hidden_size=rnn_dim, batch_first=True,
+            self.rnn = nn.LSTM(input_size=input_dim, hidden_size=num_hidden, batch_first=True,
                                bidirectional=bd, num_layers=n_layer, dropout=drop_rate)
         else:
             raise ValueError("`rnn_type` must instead be ['rnn', 'gru', 'lstm'] %s" % rnn_type)
@@ -92,15 +92,15 @@ class RnnEncoder(nn.Module):
                 weight_init.orthogonal_(w)
 
     def calculate_effect_dim(self):
-        return self.rnn_dim * self.n_direction
+        return self.num_hidden * self.n_direction
 
     def init_hidden(self, trainable=True):
         if self.rnn_type == 'lstm':
-            h0 = nn.Parameter(torch.zeros(self.n_layer * self.n_direction, 1, self.rnn_dim), requires_grad=trainable)
-            c0 = nn.Parameter(torch.zeros(self.n_layer * self.n_direction, 1, self.rnn_dim), requires_grad=trainable)
+            h0 = nn.Parameter(torch.zeros(self.n_layer * self.n_direction, 1, self.num_hidden), requires_grad=trainable)
+            c0 = nn.Parameter(torch.zeros(self.n_layer * self.n_direction, 1, self.num_hidden), requires_grad=trainable)
             return h0, c0
         else:
-            h0 = nn.Parameter(torch.zeros(self.n_layer * self.n_direction, 1, self.rnn_dim), requires_grad=trainable)
+            h0 = nn.Parameter(torch.zeros(self.n_layer * self.n_direction, 1, self.num_hidden), requires_grad=trainable)
             return h0
 
     def kl_z_term(self):
@@ -108,17 +108,17 @@ class RnnEncoder(nn.Module):
         KL Z term, KL[q(z0|X) || N(0,1)]
         :return: mean klz across batch
         """
-        return torch.Tensor([0]).to(self.args.gpus[0])
+        return torch.Tensor([0]).to(self.cfg.devices[0])
 
     def forward(self, x):
         """
         x: pytorch packed object
             input packed data; this can be obtained from
             `util.get_mini_batch()`
-        h0: tensor (n_layer * n_direction, b, rnn_dim)
+        h0: tensor (n_layer * n_direction, b, num_hidden)
         """
         B, T, _ = x.shape
-        seq_lengths = T * torch.ones(B).int().to(self.args.gpus[0])
+        seq_lengths = T * torch.ones(B).int().to(self.cfg.devices[0])
         h_rnn, _ = self.rnn(x)
         if self.reverse_input:
             h_rnn = reverse_sequence(h_rnn, seq_lengths)
@@ -232,7 +232,7 @@ class Correction(nn.Module):
     ----------
     z_dim: int
         Dim. of latent variables
-    rnn_dim: int
+    num_hidden: int
         Dim. of RNN hidden states
     clip: bool
         clip the value for numerical issues
@@ -243,17 +243,17 @@ class Correction(nn.Module):
     logvar: tensor (b, z_dim)
         Log-var that parameterizes the variational Gaussian distribution
     """
-    def __init__(self, z_dim, rnn_dim, stochastic=True):
+    def __init__(self, z_dim, num_hidden, stochastic=True):
         super().__init__()
         self.z_dim = z_dim
-        self.rnn_dim = rnn_dim
+        self.num_hidden = num_hidden
         self.stochastic = stochastic
 
-        self.lin1 = nn.Linear(z_dim, rnn_dim)
+        self.lin1 = nn.Linear(z_dim, num_hidden)
         self.act = nn.Tanh()
 
-        self.lin2 = nn.Linear(rnn_dim, z_dim)
-        self.lin_v = nn.Linear(rnn_dim, z_dim)
+        self.lin2 = nn.Linear(num_hidden, z_dim)
+        self.lin_v = nn.Linear(num_hidden, z_dim)
 
         # self.act_var = nn.Softplus()
         self.act_var = nn.Tanh()
@@ -264,12 +264,12 @@ class Correction(nn.Module):
     def forward(self, h_rnn, z_t_1=None, rnn_bidirection=False):
         """
         z_t_1: tensor (b, z_dim)
-        h_rnn: tensor (b, rnn_dim)
+        h_rnn: tensor (b, num_hidden)
         """
         assert z_t_1 is not None
         h_comb_ = self.act(self.lin1(z_t_1))
         if rnn_bidirection:
-            h_comb = (1.0 / 3) * (h_comb_ + h_rnn[:, :self.rnn_dim] + h_rnn[:, self.rnn_dim:])
+            h_comb = (1.0 / 3) * (h_comb_ + h_rnn[:, :self.num_hidden] + h_rnn[:, self.num_hidden:])
         else:
             h_comb = 0.5 * (h_comb_ + h_rnn)
         mu = self.lin2(h_comb)
@@ -284,25 +284,25 @@ class Correction(nn.Module):
 
 
 class DKF(LatentDynamicsModel):
-    def __init__(self, args, top, exptop, last_train_idx):
+    def __init__(self, cfg):
         """ Deep Kalman Filter model """
-        super().__init__(args, top, exptop, last_train_idx)
+        super().__init__(cfg)
 
         # observation
         self.embedding = nn.Sequential(
-            nn.Linear(self.args.dim**2, 2 * self.args.dim**2),
+            nn.Linear(self.cfg.dim**2, self.cfg.dim**2 // 4),
             nn.ReLU(),
-            nn.Linear(2 * self.args.dim**2, 2 * self.args.dim**2),
-            nn.ReLU(),
-            nn.Linear(2 * self.args.dim**2, self.args.rnn_dim),
+            # nn.Linear(self.cfg.dim**2 // 4, self.cfg.dim**2 // 8),
+            # nn.ReLU(),
+            nn.Linear(self.cfg.dim**2 // 4, self.cfg.num_hidden),
             nn.ReLU()
         )
-        self.encoder = RnnEncoder(args, self.args.rnn_dim, self.args.rnn_dim, n_layer=1, drop_rate=0.0,
-                                  bd=True, nonlin='relu', rnn_type="gru", reverse_input=False)
+        self.encoder = RnnEncoder(cfg, self.cfg.num_hidden, self.cfg.num_hidden, n_layer=self.cfg.rnn_layers, drop_rate=0.0,
+                                  bd=self.cfg.bidirectional, nonlin='relu', rnn_type=self.cfg.rnn_type, reverse_input=False)
 
         # generative model
-        self.transition = Transition_Recurrent(z_dim=self.args.latent_dim, transition_dim=128)
-        self.estimation = Correction(z_dim=self.args.latent_dim, rnn_dim=self.args.rnn_dim, stochastic=True)
+        self.transition = Transition_Recurrent(z_dim=self.cfg.latent_dim, transition_dim=self.cfg.transition_dim)
+        self.estimation = Correction(z_dim=self.cfg.latent_dim, num_hidden=self.cfg.num_hidden, stochastic=True)
 
         # initialize hidden states
         self.mu_p_0, self.var_p_0 = self.transition.init_z_0(trainable=False)
@@ -313,6 +313,9 @@ class DKF(LatentDynamicsModel):
         self.var_qs = None
         self.mu_ps = None
         self.var_ps = None
+        
+        # placeholder for z_amort
+        self.z_amort = None
 
     def reparameterization(self, mu, var):
         std = torch.exp(0.5 * var)
@@ -322,26 +325,33 @@ class DKF(LatentDynamicsModel):
     def latent_dynamics(self, T, x_rnn):
         batch_size = x_rnn.shape[0]
 
-        if T > self.args.z_amort:
+        if T > self.z_amort:
             T_final = T
         else:
-            T_final = self.args.z_amort
+            T_final = self.z_amort
 
-        z_ = torch.zeros([batch_size, T_final, self.args.latent_dim]).to(self.args.gpus[0])
-        mu_ps = torch.zeros([batch_size, self.args.z_amort, self.args.latent_dim]).to(self.args.gpus[0])
-        var_ps = torch.zeros([batch_size, self.args.z_amort, self.args.latent_dim]).to(self.args.gpus[0])
-        mu_qs = torch.zeros([batch_size, self.args.z_amort, self.args.latent_dim]).to(self.args.gpus[0])
-        var_qs = torch.zeros([batch_size, self.args.z_amort, self.args.latent_dim]).to(self.args.gpus[0])
+        z_ = torch.zeros([batch_size, T_final, self.cfg.latent_dim]).to(self.cfg.devices[0])
+        if not self.cfg.use_q_forecast:
+            mu_ps = torch.zeros([batch_size, self.z_amort, self.cfg.latent_dim]).to(self.cfg.devices[0])
+            var_ps = torch.zeros([batch_size, self.z_amort, self.cfg.latent_dim]).to(self.cfg.devices[0])
+            mu_qs = torch.zeros([batch_size, self.z_amort, self.cfg.latent_dim]).to(self.cfg.devices[0])
+            var_qs = torch.zeros([batch_size, self.z_amort, self.cfg.latent_dim]).to(self.cfg.devices[0])
+        else:
+            mu_ps = torch.zeros([batch_size, T_final, self.cfg.latent_dim]).to(self.cfg.devices[0])
+            var_ps = torch.zeros([batch_size, T_final, self.cfg.latent_dim]).to(self.cfg.devices[0])
+            mu_qs = torch.zeros([batch_size, T_final, self.cfg.latent_dim]).to(self.cfg.devices[0])
+            var_qs = torch.zeros([batch_size, T_final, self.cfg.latent_dim]).to(self.cfg.devices[0])
+            x_qs = torch.zeros([batch_size, T_final, self.cfg.dim, self.cfg.dim]).to(self.cfg.devices[0])
 
-        z_q_0 = self.z_q_0.expand(batch_size, self.args.latent_dim)  # q(z_0)
-        mu_p_0 = self.mu_p_0.expand(batch_size, 1, self.args.latent_dim)
-        var_p_0 = self.var_p_0.expand(batch_size, 1, self.args.latent_dim)
+        z_q_0 = self.z_q_0.expand(batch_size, self.cfg.latent_dim)  # q(z_0)
+        mu_p_0 = self.mu_p_0.expand(batch_size, 1, self.cfg.latent_dim)
+        var_p_0 = self.var_p_0.expand(batch_size, 1, self.cfg.latent_dim)
         z_prev = z_q_0
         z_[:, 0, :] = z_prev
 
-        for t in range(self.args.z_amort):
+        for t in range(self.z_amort):
             # zt = self.transition(z_prev)
-            mu_q, var_q = self.estimation(x_rnn[:, t, :], z_prev, rnn_bidirection=True)
+            mu_q, var_q = self.estimation(x_rnn[:, t, :], z_prev, rnn_bidirection=self.cfg.bidirectional)
             zt_q = self.reparameterization(mu_q, var_q)
             z_prev = zt_q
 
@@ -355,29 +365,59 @@ class DKF(LatentDynamicsModel):
             mu_ps[:, t, :] = mu_p
             var_ps[:, t, :] = var_p
 
-        if T > self.args.z_amort:
-            for t in range(self.args.z_amort, T):
-                # p(z_{t+1} | z_t)
-                mu_p, var_p = self.transition(z_prev)
-                zt_p = self.reparameterization(mu_p, var_p)
-                z_[:, t, :] = zt_p
+        if T > self.z_amort:
+            for t in range(self.z_amort, T):
+                if self.cfg.use_q_forecast:
+                    y = self.decoder(z_prev.unsqueeze(1))
+                    x_qs[:,t,:,:] = y.squeeze()
+                    y = self.encoder(self.embedding(y.view(y.size(0), 1, -1)))
+                    mu_q, var_q = self.estimation(y[:,0,:], z_prev, rnn_bidirection=self.cfg.bidirectional)
+                    zt_q = self.reparameterization(mu_q, var_q)
+                    z_prev = zt_q
+                    
+                    mu_p, var_p = self.transition(z_prev)
+                    zt_p = self.reparameterization(mu_p, var_p)
+
+                    z_[:, t, :] = zt_q
+                    mu_qs[:, t, :] = mu_q
+                    var_qs[:, t, :] = var_q
+                    mu_ps[:, t, :] = mu_p
+                    var_ps[:, t, :] = var_p
+                else:
+                    # p(z_{t+1} | z_t)
+                    mu_p, var_p = self.transition(z_prev)
+                    zt_p = self.reparameterization(mu_p, var_p)
+                    z_[:, t, :] = zt_p
+                    z_prev = zt_p
 
         mu_ps = torch.cat([mu_p_0, mu_ps[:, :-1, :]], dim=1)
         var_ps = torch.cat([var_p_0, var_ps[:, :-1, :]], dim=1)
 
         self.mu_qs, self.var_qs = mu_qs, var_qs
         self.mu_ps, self.var_ps = mu_ps, var_ps
-        return z_, mu_qs, var_qs, mu_ps, var_ps
+        if self.cfg.use_q_forecast:
+            return z_, mu_qs, var_qs, mu_ps, var_ps, x_qs
+        else:    
+            return z_, mu_qs, var_qs, mu_ps, var_ps
 
     def forward(self, x, generation_len):
+        if self.trainer.training:
+            self.z_amort = self.cfg.z_amort_train
+        else:
+            self.z_amort = self.cfg.z_amort_test
+            
         batch_size = x.size(0)
 
         x = x.view(batch_size, generation_len, -1)
         x = self.embedding(x)
         x_rnn = self.encoder(x)
 
-        z_, mu_qs, var_qs, mu_ps, var_ps = self.latent_dynamics(generation_len, x_rnn)
-        x_ = self.decoder(z_.view(batch_size * generation_len, -1))
+        if not self.cfg.use_q_forecast:
+            z_, mu_qs, var_qs, mu_ps, var_ps = self.latent_dynamics(generation_len, x_rnn)
+            x_ = self.decoder(z_)
+        else:
+            z_, mu_qs, var_qs, mu_ps, var_ps, x_ = self.latent_dynamics(generation_len, x_rnn)
+            x_[:,:self.z_amort,:,:] = self.decoder(z_[:,:self.z_amort,:])
         return x_, z_
 
     def model_specific_loss(self, *args, train=True):
@@ -385,10 +425,3 @@ class DKF(LatentDynamicsModel):
         q = Normal(self.mu_qs, torch.exp(0.5 * self.var_qs))
         p = Normal(self.mu_ps, torch.exp(0.5 * self.var_ps))
         return kl(q, p).sum([-1]).mean()
-
-    @staticmethod
-    def get_model_specific_args():
-        """ Get model-specific  """
-        return {
-            "rnn_dim": 64   # float (default=64) size of the RNN encoder dim
-        }

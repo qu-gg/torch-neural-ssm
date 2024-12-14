@@ -13,41 +13,42 @@ from torch.distributions import Normal, kl_divergence as kl
 
 
 class FakeEncoder(nn.Module):
-    def __init__(self, args):
+    def __init__(self, cfg):
         super().__init__()
-        self.args = args
+        self.cfg = cfg
 
     def kl_z_term(self):
-        return torch.Tensor([0.]).to(self.args.gpus[0])
+        return torch.Tensor([0.]).to(self.cfg.devices[0])
 
 
 class VRNN(LatentDynamicsModel):
-    def __init__(self, args, top, exptop):
+    def __init__(self, cfg):
         """ Latent dynamics as parameterized by a global deterministic neural ODE """
-        super().__init__(args, top, exptop)
-
-        self.encoder = FakeEncoder(args)
+        super().__init__(cfg)
+        self.encoder = FakeEncoder(cfg)
+        self.decoder = None
 
         ### General parameters
-        self.x_dim = self.args.dim ** 2
-        self.z_dim = self.args.latent_dim
+        self.x_dim = self.cfg.dim ** 2
+        self.z_dim = self.cfg.latent_dim
         self.dropout_p = 0.2
         self.y_dim = self.x_dim
         self.activation = nn.LeakyReLU(0.1)
         self.sigmoid = nn.Sigmoid()
+        self.z_amort = None
 
         ### Feature extractors
-        self.dense_x = [512]
-        self.dense_z = [512]
+        self.dense_x = [256]
+        self.dense_z = [256]
 
         ### Dense layers
-        self.dense_hx_z = [256]
+        self.dense_hx_z = [128]
         self.dense_hz_x = [256]
-        self.dense_h_z = [256]
+        self.dense_h_z = [128]
 
         ### RNN
-        self.dim_RNN = 128
-        self.num_RNN = 2
+        self.dim_RNN = 16
+        self.num_RNN = 1
 
         ### Beta-loss
         self.beta = 1
@@ -188,18 +189,18 @@ class VRNN(LatentDynamicsModel):
         x = x.permute(1, 0, 2)
 
         # Create variable holder and send to GPU if needed
-        self.z_mean = torch.zeros((seq_len, batch_size, self.z_dim)).to(self.args.gpus[0])
-        self.z_logvar = torch.zeros((seq_len, batch_size, self.z_dim)).to(self.args.gpus[0])
-        y = torch.zeros((seq_len, batch_size, self.y_dim)).to(self.args.gpus[0])
-        self.z = torch.zeros((seq_len, batch_size, self.z_dim)).to(self.args.gpus[0])
-        h = torch.zeros((seq_len, batch_size, self.dim_RNN)).to(self.args.gpus[0])
-        h_t = torch.zeros(self.num_RNN, batch_size, self.dim_RNN).to(self.args.gpus[0])
-        c_t = torch.zeros(self.num_RNN, batch_size, self.dim_RNN).to(self.args.gpus[0])
+        self.z_mean = torch.zeros((seq_len, batch_size, self.z_dim)).to(self.cfg.devices[0])
+        self.z_logvar = torch.zeros((seq_len, batch_size, self.z_dim)).to(self.cfg.devices[0])
+        y = torch.zeros((seq_len, batch_size, self.y_dim)).to(self.cfg.devices[0])
+        self.z = torch.zeros((seq_len, batch_size, self.z_dim)).to(self.cfg.devices[0])
+        h = torch.zeros((seq_len, batch_size, self.dim_RNN)).to(self.cfg.devices[0])
+        h_t = torch.zeros(self.num_RNN, batch_size, self.dim_RNN).to(self.cfg.devices[0])
+        c_t = torch.zeros(self.num_RNN, batch_size, self.dim_RNN).to(self.cfg.devices[0])
 
         # For the observed frames, use real input; otherwise use previous generated frame
-        feature_x_obs = self.feature_extractor_x(x[:self.args.z_amort])
+        feature_x_obs = self.feature_extractor_x(x[:self.z_amort])
         for t in range(generation_len):
-            if t < self.args.z_amort:
+            if t < self.z_amort:
                 feature_xt = feature_x_obs[t, :, :].unsqueeze(0)
             else:
                 feature_xt = self.feature_extractor_x(y_prev)
@@ -220,7 +221,7 @@ class VRNN(LatentDynamicsModel):
         self.z_mean_p, self.z_logvar_p = self.generation_z(h)
 
         # Reshape and permute reconstructions + embeddings back to useable shapes
-        y = y.permute(1, 0, 2).reshape([batch_size, seq_len, self.args.dim, self.args.dim])
+        y = y.permute(1, 0, 2).reshape([batch_size, seq_len, self.cfg.dim, self.cfg.dim])
         embeddings = self.z.permute(1, 0, 2)
         return y, embeddings
 

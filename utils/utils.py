@@ -3,9 +3,7 @@
 
 Utility functions across files
 """
-import os
 import math
-import numpy as np
 import torch.nn as nn
 
 from omegaconf import DictConfig, OmegaConf
@@ -19,86 +17,46 @@ def flatten_cfg(cfg: DictConfig):
 
     # Loop through each item, merging with the main cfg if its another DictConfig
     for key, value in cfg.copy().items():
-        if isinstance(value, DictConfig):
+        if isinstance(value, DictConfig):            
             cfg.merge_with(cfg.pop(key))
 
+    # Do it a second time for nested cfgs
+    for key, value in cfg.copy().items():
+            if isinstance(value, DictConfig):            
+                cfg.merge_with(cfg.pop(key))
+
+    print(cfg)
     return cfg
 
 
-def get_model(name, system_identification):
+def get_model(name):
     """ Import and return the specific latent dynamics function by the given name"""
     # Lowercase name in case of misspellings
     name = name.lower()
 
-    #### Models
-
-    # Bayesian Neural ODE
-    if name == "bnode":
-        if system_identification is True:
-            from models.system_identification.BayesNeuralODE import BayesNeuralODE
-            return BayesNeuralODE
-        else:
-            raise NotImplementedError("BayesNODE State Estimation is not yet implemented.")
-
-    # Neural ODE
-    elif name == "node":
-        if system_identification is True:
-            from models.system_identification.NeuralODE import NeuralODE
-        else:
-            from models.state_estimation.NeuralODE import NeuralODE
-        return NeuralODE
-
-    # Recurrent Generative Network (Residual)
-    if name == "rgnres":
-        if system_identification is True:
-            from models.system_identification.RGNRes import RGNRes
-        else:
-            raise NotImplementedError("RGN-Res State Estimation is not yet implemented.")
-        return RGNRes
-
-    # Recurrent Generative Network
-    if name == "rgn":
-        if system_identification is True:
-            from models.system_identification.RGN import RGN
-        else:
-            raise NotImplementedError("RGN State Estimation is not yet implemented.")
-        return RGN
-
-    # Long Short-Term Memory Cell
-    if name == "lstm":
-        if system_identification is True:
-            from models.system_identification.LSTM_SI import LSTM_SI
-        else:
-            raise NotImplementedError("LSTM State Estimation is not yet implemented.")
-        return LSTM_SI
-
-    #### Baselines
-
-    # Variational Recurrent Neural Network
+    ## Group A Models
     if name == "vrnn":
-        from models.state_estimation.VRNN import VRNN
+        from models.group_a.VRNN import VRNN
         return VRNN
 
-    # Deep Kalman Filter
     if name == "dkf":
-        from models.state_estimation.DKF import DKF
+        from models.group_a.DKF import DKF
         return DKF
-
-    # State Estimation Models
-    if name == "lstm_se":
-        from models.state_estimation.LSTM_SE import LSTM_SE
-        return LSTM_SE
-
-    # Deep Variational Bayes Filter
-    if name == "dvbf":
-        from models.system_identification.DVBF import DVBF
-        return DVBF
-
-    # Kalman Variational Auto-encoder
+    
+    ## Group B1 Models
     if name == "kvae":
-        from models.system_identification.KVAE import KVAE
+        from models.group_b1.KVAE import KVAE
         return KVAE
+    
+    ## Group B2 Models
+    if name == "node":
+        from models.group_b2.NeuralODE import NeuralODE
+        return NeuralODE
 
+    if name == "rgnres":
+        from models.group_b2.RGNRes import RGNRes
+        return RGNRes
+    
     # Given no correct model type, raise error
     raise NotImplementedError("Model type {} not implemented.".format(name))
 
@@ -129,30 +87,6 @@ def get_act(act="relu"):
         return None
 
 
-def find_best_step(ckpt_folder):
-    """
-    Find the highest epoch in the Test Tube file structure.
-    :param ckpt_folder: dir where the checpoints are being saved.
-    :return: float of the highest epoch reached by the checkpoints.
-    """
-    best_ckpt = None
-    best_step = None
-    best = np.inf
-    filenames = os.listdir(f"{ckpt_folder}/checkpoints/")
-    for filename in filenames:
-        if "last" in filename:
-            continue
-
-        test_value = float(filename[:-5].split("mse")[-1])
-        test_step = int(filename.split('-')[0].replace('step', ''))
-        if test_value < best:
-            best = test_value
-            best_ckpt = filename
-            best_step = test_step
-
-    return best_ckpt, best_step
-
-
 def determine_annealing_factor(n_updates, min_anneal_factor=0.0, anneal_update=10000):
     """
     Handles annealing the KL restriction over a number of update steps to slowly introduce the regularization
@@ -172,21 +106,6 @@ def determine_annealing_factor(n_updates, min_anneal_factor=0.0, anneal_update=1
     else:
         anneal_factor = 1.0
     return anneal_factor
-
-
-def strtobool(val):
-    """Convert a string representation of truth to true (1) or false (0).
-    True values are 'y', 'yes', 't', 'true', 'on', and '1'; false values
-    are 'n', 'no', 'f', 'false', 'off', and '0'.
-    Raises ValueError if 'val' is anything else.
-    """
-    val = val.lower()
-    if val in ('y', 'yes', 't', 'true', 'on', '1', 'True',  'T',  'true'):
-        return True
-    elif val in ('n', 'no', 'f', 'false', 'off', '0', 'False', 'F', 'false'):
-        return False
-    else:
-        raise ValueError("invalid truth value %r" % (val,))
 
 
 class CosineAnnealingWarmRestartsWithDecayAndLinearWarmup(_LRScheduler):

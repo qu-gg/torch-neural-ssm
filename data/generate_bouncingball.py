@@ -127,10 +127,11 @@ if __name__ == '__main__':
 
     # Parameters of generation, resolution and number of samples
     scale = 1
-    timesteps = 75
+    timesteps = 40
     training_size = 10000
     validation_size = 1500
     testing_size = 2500
+    total_size = training_size + validation_size + testing_size
 
     base_dir = f"bouncingball_{training_size}samples_{timesteps}steps/"
 
@@ -140,13 +141,28 @@ if __name__ == '__main__':
     np.random.seed(1234)
 
     # Generate the data sequences
-    cannon = BallBox(dt=0.5, res=(32*scale, 32*scale), init_pos=(16*scale, 16*scale), init_std=8,
-                     wall=None, gravity=(0.0, 0.0), ball_color="white")
-    i, s = cannon.run(delay=None, iterations=timesteps, sequences=training_size + validation_size + testing_size,
-                      radius=4, angle_limits=(0, 360), velocity_limits=(5.0, 10.0), save='npz')
+    cannon = BallBox(dt=0.25, res=(32*scale, 32*scale), init_pos=(16*scale, 16*scale), init_std=8,
+                     wall=None, gravity=(0.0, -5.0), ball_color="white")
+    i, s = cannon.run(delay=None, iterations=timesteps, sequences=total_size + 5000,
+                      radius=3, angle_limits=(0, 360), velocity_limits=(5.0, 10.0), save='npz')
 
     # Setting the pixels to a uniform background and foreground (for simplicity of training)
     i = (i > 0).astype(np.float32)
+
+    # Brute force check for any bad trajectories where the ball leaves
+    bad_indices = []
+    for seq_idx, sequence in enumerate(i):
+        sums = np.sum(sequence, axis=(1, 2))
+        if np.where(sums == 0.0)[0].shape[0] > 0:
+            bad_indices.append(seq_idx)
+            
+    print(f"Bad indices: {len(bad_indices)}")
+
+    i = np.delete(i, bad_indices, 0)
+    s = np.delete(s, bad_indices, 0)
+    if i.shape[0] > total_size:
+        i = i[:total_size, :]
+        s = s[:total_size, :]
 
     # Break into train and test sets, adding in generic labels
     train_images = i[:training_size]

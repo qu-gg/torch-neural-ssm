@@ -5,8 +5,8 @@ num_channels: 1
 # Dynamics MLP function parameters
 num_layers: 2
 num_hidden: 128
-latent_dim: 12
+latent_dim: 8
 latent_act: swish
 
 # VAE parameters
-num_filters: 32
+num_filters: 24

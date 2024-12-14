@@ -1,0 +1,5 @@
+model_type: kvae
+stochastic: true
+
+defaults:
+  - architecture: default

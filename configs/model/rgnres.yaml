@@ -1,0 +1,5 @@
+model_type: rgnres
+stochastic: true
+
+defaults:
+  - architecture: default

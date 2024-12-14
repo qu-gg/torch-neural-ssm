@@ -1,8 +1,8 @@
 defaults:
   - _self_
   - model: node
-  - dataset: bouncingball_10000samples_75steps
-  - training: default
+  - dataset: bouncingball
+  - training: forecast_forecast
 
 hydra:
   output_subdir: null
@@ -11,15 +11,13 @@ hydra:
 
 # Random seed of the run
 seed: 125125125
+devices: [0]
 
 # Experiment folder naming
-expname: ${seed}seed_${dataset.dataset}_${training.num_steps}iterations_${model.model_type}
+expname: ${dataset.dataset}_${model.model_type}_${training.z_amort_train}ztrain_${training.z_amort_test}ztest_${training.num_steps}iterations_${seed}seed
 model_path: ""
 checkpt: ""
 
 # For training, overrideable by cmd
 train: true
 resume: false
-
-# Whether to save reconstructions to disk
-save_files: true

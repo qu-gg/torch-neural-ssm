@@ -14,33 +14,32 @@ from torch.distributions.multivariate_normal import MultivariateNormal
 
 
 class FakeEncoder(nn.Module):
-    def __init__(self, args):
+    def __init__(self, cfg):
         super().__init__()
-        self.args = args
+        self.cfg = cfg
 
     def kl_z_term(self):
-        return torch.Tensor([0.]).to(self.args.gpus[0])
+        return torch.Tensor([0.]).to(self.cfg.devices[0])
 
 
 class KVAE(LatentDynamicsModel):
-    def __init__(self, args, top, exptop, last_train_idx):
+    def __init__(self, cfg):
         """ Latent dynamics as parameterized by a global deterministic neural ODE """
-        super().__init__(args, top, exptop, last_train_idx)
-
-        self.encoder = FakeEncoder(args)
+        super().__init__(cfg)
+        self.encoder = FakeEncoder(cfg)
 
         ## General parameters
-        self.x_dim = self.args.dim**2
-        self.y_dim = self.args.dim**2
-        self.a_dim = self.args.latent_dim * 2
-        self.z_dim = self.args.latent_dim
-        self.u_dim = self.args.latent_dim * 2
+        self.x_dim = self.cfg.dim**2
+        self.y_dim = self.cfg.dim**2
+        self.a_dim = self.cfg.latent_dim * 2
+        self.z_dim = self.cfg.latent_dim
+        self.u_dim = self.cfg.latent_dim * 2
         self.dropout_p = 0.2
         self.activation = nn.ReLU()
 
         # VAE
-        self.dense_x_a = [1024, 512]
-        self.dense_a_x = [1024, 512]
+        self.dense_x_a = [512, 256]
+        self.dense_a_x = [512, 256]
 
         # LGSSM
         self.init_kf_mat = 0.05
@@ -49,7 +48,7 @@ class KVAE(LatentDynamicsModel):
         self.init_cov = 20
 
         # Dynamics params (alpha)
-        self.K = 15
+        self.K = 4
         self.dim_RNN_alpha = 128
         self.num_RNN_alpha = 2
 
@@ -104,24 +103,23 @@ class KVAE(LatentDynamicsModel):
         # z = Az + Bu
         # a = Cz
         self.A = torch.tensor(np.array([np.eye(self.z_dim) for _ in range(self.K)]), dtype=torch.float32,
-                              requires_grad=True, device=self.args.gpus[0])  # (K, z_dim. z_dim,)
+                              requires_grad=True, device=self.cfg.devices[0])  # (K, z_dim. z_dim,)
         self.B = torch.tensor(
             np.array([self.init_kf_mat * np.random.randn(self.z_dim, self.u_dim) for _ in range(self.K)]),
-            dtype=torch.float32, requires_grad=True, device=self.args.gpus[0])  # (K, z_dim, u_dim)
+            dtype=torch.float32, requires_grad=True, device=self.cfg.devices[0])  # (K, z_dim, u_dim)
         self.C = torch.tensor(
             np.array([self.init_kf_mat * np.random.randn(self.a_dim, self.z_dim) for _ in range(self.K)]),
-            dtype=torch.float32, requires_grad=True, device=self.args.gpus[0])  # (K, a_dim, z_dim)
-        self.Q = self.noise_transition * torch.eye(self.z_dim).to(self.args.gpus[0])  # (z_dim, z_dim)
-        self.R = self.noise_emission * torch.eye(self.a_dim).to(self.args.gpus[0])  # (a_dim, a_dim)
-        self._I = torch.eye(self.z_dim).to(self.args.gpus[0])  # (z_dim, z_dim)
+            dtype=torch.float32, requires_grad=True, device=self.cfg.devices[0])  # (K, a_dim, z_dim)
+        self.Q = self.noise_transition * torch.eye(self.z_dim).to(self.cfg.devices[0])  # (z_dim, z_dim)
+        self.R = self.noise_emission * torch.eye(self.a_dim).to(self.cfg.devices[0])  # (a_dim, a_dim)
+        self._I = torch.eye(self.z_dim).to(self.cfg.devices[0])  # (z_dim, z_dim)
 
         ###############
         #### Alpha ####
         ###############
-        self.a_init = torch.zeros((1, self.a_dim), requires_grad=True, device=self.args.gpus[0])  # (bs, a_dim)
+        self.a_init = torch.zeros((1, self.a_dim), requires_grad=True, device=self.cfg.devices[0])  # (bs, a_dim)
         self.rnn_alpha = nn.LSTM(self.a_dim, self.dim_RNN_alpha, self.num_RNN_alpha, bidirectional=False)
-        self.mlp_alpha = nn.Sequential(nn.Linear(self.dim_RNN_alpha, self.K),
-                                       nn.Softmax(dim=-1))
+        self.mlp_alpha = nn.Sequential(nn.Linear(self.dim_RNN_alpha, self.K), nn.Softmax(dim=-1))
 
         ############################
         #### Scheduler Training ####
@@ -279,7 +277,7 @@ class KVAE(LatentDynamicsModel):
         a_gen = C_mix.matmul(mu_smooth.unsqueeze(-1)).view(seq_len, batch_size, self.a_dim)  # (seq_len, bs, a_dim)
         return a_gen, mu_smooth, Sigma_smooth, A_mix, B_mix, C_mix
 
-    def forward(self, x, **kwargs):
+    def forward(self, x, generation_len):
         # train input: (batch_size, x_dim, seq_len)
         # test input:  (x_dim, seq_len)
         # need input:  (seq_len, batch_size, x_dim)
@@ -292,7 +290,7 @@ class KVAE(LatentDynamicsModel):
 
         # main part
         self.a, self.a_mean, self.a_logvar = self.inference(x)
-        u_0 = torch.zeros(1, batch_size, self.u_dim).to(self.args.gpus[0])
+        u_0 = torch.zeros(1, batch_size, self.u_dim).to(self.cfg.devices[0])
         self.u = torch.cat((u_0, self.a[:-1]), 0)
         a_gen, self.mu_smooth, self.Sigma_smooth, self.A_mix, self.B_mix, self.C_mix = self.kf_smoother(
             self.a, self.u, self.K, self.A, self.B, self.C, self.R, self.Q
@@ -304,8 +302,8 @@ class KVAE(LatentDynamicsModel):
         self.y = self.y.permute(1, 0, 2)
 
         # Reshape y to image dimensions
-        self.y = self.y.reshape([batch_size, seq_len, self.args.dim, self.args.dim])
-        return self.y, torch.zeros([batch_size, seq_len])
+        self.y = self.y.reshape([batch_size, seq_len, self.cfg.dim, self.cfg.dim])
+        return self.y, torch.zeros([batch_size, seq_len, self.cfg.latent_dim])
 
     def model_specific_loss(self, x, x_rec, train=True):
         # batch_size, seq_len = x.shape[0], x.shape[1]
@@ -321,7 +319,12 @@ class KVAE(LatentDynamicsModel):
 
         # log p_{\gamma}(a_tilde, z_tilde | u) < in sub-comment, 'tilde' is hidden for simplification >
         # >>> log p(z_t | z_tm1, u_t), transition
-        mvn_smooth = MultivariateNormal(self.mu_smooth, self.Sigma_smooth)
+        Sigma_smooth_stable = self.Sigma_smooth
+        L = torch.linalg.cholesky(Sigma_smooth_stable)
+        mvn_smooth = MultivariateNormal(self.mu_smooth, scale_tril=L)
+
+        
+        # mvn_smooth = MultivariateNormal(self.mu_smooth, self.Sigma_smooth)
         z_smooth = mvn_smooth.sample()  # # (seq_len, bs, z_dim)
         Az_tm1 = self.A_mix[:-1].matmul(z_smooth[:-1].unsqueeze(-1)).view(seq_len - 1, batch_size, -1)  # (seq_len, bs, z_dim)
         Bu_t = self.B_mix[:-1].matmul(self.u[:-1].unsqueeze(-1)).view(seq_len - 1, batch_size, -1)  # (seq_len, bs, z_dim)

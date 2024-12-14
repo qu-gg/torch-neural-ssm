@@ -1,0 +1,52 @@
+# PyTorch-Lightning hardware params
+accelerator: gpu
+num_workers: 0
+
+# Which GPU ID to run on
+devices: [0]
+
+# Number of steps per task
+num_steps: 50001
+
+# How often to log metrics and how often to save image reconstructions
+metric_interval: 50
+image_interval: 500
+
+# What metrics to evaluate on
+metrics:
+  - vpt
+  - reconstruction_mse
+
+test_metrics:
+  - vpt
+  - dst
+  - vpd
+  - reconstruction_mse
+  - extrapolation_mse
+
+# Batch size
+batch_size: 64
+
+# Learning rate and cosine annealing scheduler
+# We use CosineAnnealing with WarmRestarts
+# More information here: https://github.com/qu-gg/pytorch-cosine-annealing-with-decay-and-initial-warmup
+learning_rate: 1e-3
+scheduler_use: true
+scheduler_restart_interval: 5000
+scheduler_warmup_steps: 200
+scheduler_decay: 0.90
+
+# KL loss betas
+beta_z0: 1e-2
+beta_kl: 1e-3
+
+# How many steps are given as observed data
+# For forecasting, this will be small (e.g., 3 to 5)
+# For reconstruction, this will be the train_length
+z_amort_train: 20
+z_amort_test: 20
+
+# Total steps to either reconstruct or forecast for
+train_length: 20
+val_length: 20
+test_length: 20

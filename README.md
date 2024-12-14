@@ -368,39 +368,61 @@ The project's folder structure is as follows:
 ```
   torchssm/
   │
-  ├── train.py                      # Training entry point that takes in user args and handles boilerplate
-  ├── test.py                       # Testing script to get reconstructions and metrics on a testing set
+  ├── main.py                       # Training entry point that takes in user args and handles boilerplate
   ├── tune.py                       # Performs a hyperparameter search for a given dataset using Ray[Tune]
   ├── README.md                     # What you're reading right now :^)
   ├── requirements.txt              # Anaconda requirements file to enable easy setup
-  |
+  ├── configs/
+  │   ├── dataset/                  # Dataset config files
+  │   ├── model/                    # Model-specific hyperparameters
+  │   ├── training/                 # Training-setting parameters
+  |   └── config.yaml               # Base config file
   ├── data/
   |   ├── <dataset_type>            # Name of the stored dynamics dataset (e.g. pendulum)
   |   ├── generate_bouncingball.py  # Dataset generation script for Bouncing Ball
   |   ├── generate_hamiltonian.py   # Dataset generation script for Hamiltonian Dynamics
-  |   └── tar_directory.py          # WebDataset generation script 
+  |   └── visualize_data.py         # Visualize trajectories of a dataset
   ├── experiments/
   |   └── <model_name>              # Name of the dynamics model run
   |       └── <experiment_type>     # Given name for the ran experiment
   |           └── <version_x>/      # Each experiment type has its sequential lightning logs saved
-  ├── lightning_logs/
-  |   ├── version_0/                # Placeholder lightning log folder
-  |   └── ...                       # Subsequent runs
   ├── models/
   │   ├── CommonDynamics.py         # Abstract PyTorch-Lightning Module to handle train/test loops
   │   ├── CommonVAE.py              # Shared encoder/decoder Modules for the VAE portion
-  │   ├── system_identification/ 
-  │       └── ...                   # Specific System-Identification dynamics functions
-  │   └── state_estimation/
-  │       └── ...                   # Specific State-Estimation dynamics functions
+  │   ├── group_a/ 
+  │       └── ...                   # State-Estimation Examples
+  │   └── group_b1/
+  │       └── ...                   # Time-Varying System-Identification Examples
+  │   └── group_b2/
+  │       └── ...                   # Time-Invariant System-Identification Examples
   ├── utils/
-  │   ├── dataloader.py             # WebDataset class to return the dataloaders used in train/val/testing
+  │   ├── dataloader.py             # Dataloaders used in train/val/testing
   │   ├── layers.py                 # PyTorch Modules that represent general network layers
   │   ├── metrics.py                # Metric functions for evaluation
   │   ├── plotting.py               # Plotting functions for visualizatin
-  |   └── utils.py                  # General utility functions (e.g. argparsing, experiment number tracking, etc)
+  |   └── utils.py                  # General utility functions (e.g. argparsing, etc)
   └──
 ```
+
+<!-- CONFIG -->
+<a name="config"></a>
+## Config Management with Hydra
+
+This repository uses [Hydra](https://hydra.cc/) to manage configurations for running experiments, ensuring modularity, scalability, and ease of experimentation. Hydra allows for a hierarchical organization of configuration files, making it straightforward to adjust parameters for datasets, models, and training setups without editing the core code.
+
+The configuration files are organized under the `configs/` directory and follow a modular design:
+
+- **`dataset/`**: Contains configuration files specific to datasets, such as paths, preprocessing steps, and dataset-specific parameters. For example, `pendulum.yaml` might specify the length of the pendulum and time step resolution.
+- **`model/`**: Defines model-specific parameters like architecture, latent dimension size, and dynamics function hyperparameters.
+- **`training/`**: Manages training-specific settings, such as learning rate, batch size, number of epochs, and checkpointing options.
+- **`config.yaml`**: The base configuration file that aggregates default values and sets up common parameters shared across experiments.
+
+<b>Usage</b>: Hydra facilitates experiment customization and parameter sweeping with ease. By specifying the desired configuration components, users can dynamically compose configurations at runtime. For instance:
+
+```bash
+python main.py dataset=pendulum model=node training=default
+```
+
 
 <!-- DATA -->
 <a name="data"></a>
@@ -408,9 +430,7 @@ The project's folder structure is as follows:
 
 All data used throughout these experiments are available for download <a href="https://drive.google.com/drive/folders/1LEasIos71026lMnva2--U-DQXAaOI1mh?usp=sharing">here</a> on Google Drive, in which they already come in their .npz forms. Feel free to generate your own sets using the provided data scripts!
 
-<b>The following section is under WIP as I update it from WebDataset to a more standard NPZ format.</b>
-
-<b>Hamiltonian Dynamics</b>: Provided for evaluation are a <a href="https://github.com/webdataset/webdataset">WebDataset</a> dataloader and generation scripts for DeepMind's Hamiltonian Dynamics
+<b>Hamiltonian Dynamics</b>: Provided are a dataloader and generation scripts for DeepMind's Hamiltonian Dynamics
 <a href="https://github.com/deepmind/dm_hamiltonian_dynamics_suite">suite</a><sup>[4]</sup>, a simulation library for 17 different physics datasets that have known underlying Hamiltonian dynamics.
 It comes in the form of color image sequences of arbitrary length, coupled with the system's ground truth states (e.g., for pendulum, angular velocity and angle). It is well-benchmarked and customizable, making it a perfect testbed for latent dynamics function evaluation. For each setting, the physical parameters are tweakable alongside an optional friction coefficient to construct non-energy conserving systems. The location of focal points and the color of the objects are all individually tuneable, enabling mixed and complex visual datasets of varying latent dynamics.
 
@@ -418,8 +438,8 @@ It comes in the form of color image sequences of arbitrary length, coupled with 
 <p align='center'>Fig N. Pendulum-Colors Examples.</p>
 
 For the base presented experiments of this dataset, we consider and evaluate grayscale versions of pendulum and 
-mass-spring - which conveniently are just the sliced red channel of the original sets. Each set has <code>50000</code> 
-training and <code>5000</code> testing trajectories sampled at <code>Δt = 1</code> time intervals. Energy conservation 
+mass-spring - which conveniently are just the sliced red channel of the original sets. Each set has <code>10000</code> 
+training and <code>1000</code> testing trajectories sampled at <code>Δt = 1</code> time intervals. Energy conservation 
 is preserved without friction and we assume constant placement of focal points for simplicity. Note that the 
 modification to color outputs in this framework is as simple as modifying the number of channels in the 
 encoder and decoder.
@@ -433,8 +453,8 @@ forces<sup>[1,2,5]</sup>, pong<sup>[2]</sup>, and interventions<sup>[8]</sup>. T
 and velocity of the ball(s) are sampled uniformly between a set range. It is generated with the 
 <a href="https://github.com/viblo/pymunk">PyMunk</a> and <a href="https://www.pygame.org/news">PyGame</a> libraries. 
 In this repository, we consider two sets - a simple set of one gravitational force and a mixed set of 4 gravitational 
-forces in the cardinal directions with varying strengths. We similarly generate <code>50000</code> training and 
-<code>5000</code> testing trajectories, however sample them at <code>Δt = 0.1</code> intervals.
+forces in the cardinal directions with varying strengths. We similarly generate <code>10000</code> training and 
+<code>1000</code> testing trajectories, however sample them at <code>Δt = 0.1</code> intervals.
 
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/171948373-ad692ecc-bfac-49dd-86c4-137a2a5e4b73.gif" alt="bouncing ball examples" /></p>
 <p align='center'>Fig N. Single Gravity Bouncing  Ball Example.</p>
@@ -490,18 +510,14 @@ an overview of the abstract class implementation for a general Neural SSM and it
 Provided within this repository is a PyTorch class structure in which an abstract PyTorch-Lightning Module is shared 
 across all the given models, from which the specific VAE and dynamics functions inherit and override the relevant 
 forward functions for training and evaluation. Swapping between dynamics functions and PGM type is as easy as passing 
-in the model's name for arguments, e.g. `python3 train.py --model node`. As the implementation is provided in 
+in the model's name for arguments, e.g. `python3 main.py model=node`. As the implementation is provided in 
 <a href="https://pytorch-lightning.readthedocs.io/en/latest/">PyTorch-Lightning</a>, an optimization and boilerplate 
 library for PyTorch, it is recommended to be familiar at face-level.
 
 <p> </p>
-For every model run, a new <code>lightning_logs/</code> version folder is created as well as a new experiment version 
-under `experiments` related to the passed in naming arguments. Hyperparameters passed in for this run are both stored in 
-the Tensorboard instance created as well as in the local files <code>hparams.yaml, config.json</code>. Default values and available 
-options can be found in <code>train.py</code> or by running <code>python3 train.py -h</code>. During training 
-and validation sequences, all of the metrics below are automatically tracked and saved into a Tensorboard instance 
-which can be used to compare different model runs following. Every 5 epochs, reconstruction sequences against the 
-ground truth for a set of samples are saved to the experiments folder. Currently, only one checkpoint is saved based 
+For every model run, a new experiment version under `experiments/` related to the passed in naming arguments. Hyperparameters passed in for this run are both stored in the Tensorboard instance created as well as in the local files <code>hparams.yaml, config.json</code>. During training and validation sequences, all of the metrics below are automatically tracked and saved into a Tensorboard instance 
+which can be used to compare different model runs following. Every 500 batches, reconstruction sequences against the 
+ground truth for a set of samples are saved to the `experiments/` folder. Currently, only one checkpoint is saved based 
 on the last epoch ran rather than checkpoints based on the best validation score or at set epochs. Restarting training 
 from a checkpoint or loading in a model for testing is done currently by specifying the <code>ckpt_path</code> to the 
 base experiment folder and the <code>checkpt</code> filename.
@@ -516,7 +532,28 @@ plots every training epoch end.
 
 ### Implemented Dynamics
 
-<b>System Identification Models</b>: For the system identification models, we provide a variety of dynamics functions that resemble the general and special 
+<b>Group A, 'State-Estimation':</b> For the Group A PGM category, we provide a reimplementation of the classic Neural SSM work Deep Kalman Filter<sup>[7]</sup> alongside state estimation versions of the above, provided in Fig. N below. The DKF model modifies the standard Kalman Filter Gaussian transition function to incorporate non-linearity and expressivity by parameterizing the distribution parameters with neural networks  <code>z<sub>t</sub>∼<i>N</i>(G(z<sub>t−1</sub>,∆<sub>t</sub>), S(z<sub>t−1</sub>,∆<sub>t</sub>))</code><sup>[7]</sup>. 
+Additionally, we provide a reimplementation of the Variational Recurrent Neural 
+Network (VRNN), one of the starting state estimation works in Neural SSMs<sup>[22]</sup>. For the latent correction 
+step, we leverage a standard Gated Recurrent Unit (GRU) cell and the corrected latent state is what is passed to the
+decoder and likelihood function. Notably, there are two settings these models can be run under: <i>reconstruction</i>
+and <i>generation</i>. <i>Reconstruction</i> is used for training and incorporates ground truth observations to correct 
+the latent state while <i>generation</i> is used to test the forecasting abilities of the model, both short- and long-term.
+
+<p> </p>
+<p align='center'><img src="https://github.com/user-attachments/assets/b23dac3b-3399-4d64-9fe8-27ea0959d514", height=350, alt="Grou pA PGM models" /></p>
+<p align='center'>Fig N. Model schematics for Group A's implemented dynamics functions.</p>
+
+
+<b>Group B1, 'Time-Varying System-Identification':</b> For the Group B1 PGM category, we present a reimplementation of the Kalman Variational Autoencoder (KVAE)<sup>[2]</sup>, a hybrid model combining Kalman Filter dynamics with a deep recognition network. The KVAE disentangles latent states into dynamics and representations by using a structured transition model paired with a learned recognition function. Specifically, the latent dynamics are modeled as <code>x<sub>t</sub> ∼ <i>N</i>(A x<sub>t−1</sub> + Bu<sub>t</sub>, Q)</code>, where <code>A</code>, <code>B</code>, and <code>Q</code> parameterize a linear dynamical system, while the recognition network maps observations into latent space.
+We provide both state estimation and generation capabilities. State estimation incorporates observed data into the inference process at every timestep. For generation, the model tests its forecasting ability in both short- and long-term scenarios by propagating dynamics without direct observation, instead using prior reconstructions as input. 
+
+<p> </p>
+<p align='center'><img src="https://github.com/user-attachments/assets/f093ee8d-a578-4ee3-9be2-b58558a1a1e2", height=300, alt="Grou pA PGM models" /></p>
+<p align='center'>Fig N. Model schematics for Group A's implemented dynamics functions.</p>
+
+
+<b>Group B2, 'Time-Invariant System-Identification'</b>: For the system identification models, we provide a variety of dynamics functions that resemble the general and special 
 cases detailed above, which are provided in Fig N. below. The most general version is that of the Bayesian Neural ODE, 
 in which a neural ordinary differential equation<sup>[21]</sup> is sampled from a set of optimized distributional 
 parameters and used as the latent dynamics function 
@@ -526,36 +563,18 @@ of a standard Neural ODE is similarly provided, e.g.
 Recurrent Generative Network are provided, a residual version (RGN-Res) and a full-step version (RGN), that represent 
 deterministic and discrete non-linear transition functions. RGN-Res is the equivalent of a Neural ODE using a fixed 
 step Euler integrator while RGN is just a recurrent forward step function. 
-Additionally, a representation of the time-varying Linear-Gaussian SSM transition dynamics<sup>[1,2]</sup> (LGSSM) is 
-provided. And finally, a set of autoregressive models are considered (i.e. Recurrent neural networks, Long-Short Term 
-Memory networks, Gated Recurrent Unit networks) as baselines. Their PyTorch Cell implementations are used and evaluated 
-over the entire sequence, passing in the previously predicted state and observation as its inputs.
 
 <p> </p>
 Training for these models has one mode, that of taking in several observational frames to infer <b>z</b><sub>0</sub> 
-and  then outputting a full sequence autonomously without access to subsequent observations. A likelihood function is 
+and then outputting a full sequence autonomously without access to subsequent observations. A likelihood function is 
 compared over the full reconstructed sequence and optimized over. Testing and generation in this setting can be done 
-out to any horizon easily and we provide small sample datasets of <code>200</code> timesteps to evaluate out to long horizons.
+out to any horizon easily.
 
 <p> </p>
-<p align='center'><img src="https://user-images.githubusercontent.com/32918812/172108058-481009a0-41c9-449e-bc0f-7b7a45ecefe0.png", height=400, alt="sysID models" /></p>
+<p align='center'><img src="https://github.com/user-attachments/assets/acf83e41-296a-4f2c-9c5a-98f884732612", height=400, alt="sysID models" /></p>
 <p align='center'>Fig N. Model schematics for system identification's implemented dynamics functions.</p>
  
-<b>State Estimation Models</b>: For the state estimation line, we provide a reimplementation of the classic Neural SSM work Deep Kalman 
-Filter<sup>[7]</sup> alongside state estimation versions of the above, provided in Fig. N below. The DKF model modifies
-the standard Kalman Filter Gaussian transition function to incorporate non-linearity and expressivity by parameterizing 
-the distribution parameters with neural networks 
-<code>z<sub>t</sub>∼<i>N</i>(G(z<sub>t−1</sub>,∆<sub>t</sub>), S(z<sub>t−1</sub>,∆<sub>t</sub>))</code><sup>[7]</sup>. 
-The autoregressive versions for this setting can be viewed as a reimplementation of the Variational Recurrent Neural 
-Network (VRNN), one of the starting state estimation works in Neural SSMs<sup>[22]</sup>. For the latent correction 
-step, we leverage a standard Gated Recurrent Unit (GRU) cell and the corrected latent state is what is passed to the
-decoder and likelihood function. Notably, there are two settings these models can be run under: <i>reconstruction</i>
-and <i>generation</i>. <i>Reconstruction</i> is used for training and incorporates ground truth observations to correct 
-the latent state while <i>generation</i> is used to test the forecasting abilities of the model, both short- and long-term.
 
-<p> </p>
-<p align='center'><img src="https://user-images.githubusercontent.com/32918812/172186199-602a868b-77e4-44a2-b88d-64124c43afb9.png", height=400, alt="stateEst models" /></p>
-<p align='center'>Fig N. Model schematics for state estimation's implemented dynamics functions.</p>
 
 
 <!-- METRICS -->
@@ -602,20 +621,6 @@ framework decisions one can take. Trained model checkpoints and hyperparameter f
 under <code>experiments/model</code>. Evaluations are done with the metrics discussed above, as well as visualizations of 
 animated trajectories over time and latent walk visualizations.
 
-<!-- HYPERPARAMETER TUNING -->
-<a name="hyperparameters"></a>
-## Hyperparameter Tuning
-
-As is common in deep learning and variational inference tasks, the specific choices of hyper-parameters can have a 
-significant impact on the resulting performance and generalization of the model. As such, first we perform a
-hyper-parameter tuning task for each model on a shared validation set to get eachs' optimized hyper-parameter set.
-From this, the optimal set for each is carried across the various tasks given similar task complexity. 
-
-We provide a Ray[Tune] tuning script to handle training and formatting the Pytorch-Lightning outputs for each model, 
-found in <code>tune.py</code>. It automatically parallelizes across GPUs and has a convenient Tensorboard output 
-interface to compare the tuning runs. In order to run custom tuning tasks, simply create a local folder in the 
-repository root directory and rename the tune run "name" to redirect the output there. Please refer to RayTune's
-relevant <a href="https://docs.ray.io/en/latest/tune/examples/tune-pytorch-lightning.html">documentation</a> for information.
 
 <!-- PENDULUM -->
 <a name="hamiltonian"></a>
@@ -676,6 +681,7 @@ and a section on how to find the references used throughout the repo.
 ## To-Do
 
 <h4>Ablations-to-do</h4>
+
 - Generation lengths used in training (e.g. 1/2/3/5/10 frames)
 - Fixed vs variable generation lengths
 - z<sub>0</sub> inference scheme (no overlap, overlap-by-one, full overlap)

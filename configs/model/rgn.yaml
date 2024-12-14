@@ -1,0 +1,5 @@
+model_type: rgn
+stochastic: true
+
+defaults:
+  - architecture: default

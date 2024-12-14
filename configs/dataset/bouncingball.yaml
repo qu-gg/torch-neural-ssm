@@ -1,0 +1,3 @@
+dataset: bouncingball
+dataset_percent: 1.0
+batches_to_save: 50
